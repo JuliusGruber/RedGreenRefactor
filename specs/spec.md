@@ -10,6 +10,8 @@ Four **independent Claude Code sessions** collaborate in a Test-Driven Developme
 - The git repository serves as the shared state
 - Handoff mechanism coordinates transitions between sessions (see [Handoffs Specification](spec-handoffs.md))
 
+> **Terminology**: Throughout this spec, "Agent" refers to a Claude Code session with a specific role prompt (e.g., "Test List Agent" = a Claude Code session prompted to perform the planning role).
+
 ## Agent Roles
 
 ### 1. Test List Agent (Planning)
