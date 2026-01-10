@@ -11,8 +11,9 @@ Four sessions of the same coding agent collaborate in a Test-Driven Development 
 - Analyzes requirements and breaks them down
 - **Writes a comprehensive test list** (stored as a file or document)
 - Marks tests as pending/completed in the list
-- **Commits** the test list (if changes were made)
-- **Handoff →** Passes the **next pending test** to the Test Agent
+- **Decides when the feature is complete** (not just "no more tests")
+- **Commits** the test list
+- **Handoff →** Passes the **next pending test** to the Test Agent, or signals completion
 
 ### 2. Test Agent (Red Phase)
 - Receives **one test** from the test list (the next pending test)
