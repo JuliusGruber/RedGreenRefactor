@@ -37,8 +37,8 @@ Since each agent runs as an independent Claude Code session (no shared memory), 
 
 - What exact information is passed from Test List Agent to Test Agent?
 - What exact information is passed from Test Agent to Implementing Agent?
-- What exact information is passed from Implementing Agent to Review Agent?
-- What exact information is passed from Review Agent back to Test List Agent?
+- What exact information is passed from Implementing Agent to Refactor Agent?
+- What exact information is passed from Refactor Agent back to Test List Agent?
 
 ### Git as Shared State
 

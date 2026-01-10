@@ -10,8 +10,8 @@
 - What if the Implementing Agent cannot make the test pass?
 - What if making the new test pass breaks existing tests?
 
-### Review Agent Failures
-- What if the Review Agent's refactoring breaks tests?
+### Refactor Agent Failures
+- What if the Refactor Agent's refactoring breaks tests?
 - How many retry attempts before escalating?
 
 ### General Recovery
