@@ -2,7 +2,13 @@
 
 ## Main Idea
 
-Four sessions of the same coding agent collaborate in a Test-Driven Development pipeline. Each agent has a specialized role and hands off to the next agent in sequence, following the Red-Green-Refactor cycle.
+Four **independent Claude Code sessions** collaborate in a Test-Driven Development pipeline. Each session has a specialized role and hands off to the next session in sequence, following the Red-Green-Refactor cycle.
+
+**Key architectural points:**
+- Sessions are fully independent (like 4 separate terminal windows running `claude`)
+- No shared memory or context between sessions
+- The git repository serves as the shared state
+- Handoff mechanism coordinates transitions between sessions (see [Handoffs Specification](spec-handoffs.md))
 
 ## Agent Roles
 
