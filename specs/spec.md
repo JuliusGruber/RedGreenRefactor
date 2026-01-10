@@ -9,20 +9,21 @@ Four sessions of the same coding agent collaborate in a Test-Driven Development 
 ### 1. Test List Agent (Planning)
 - Receives a feature request
 - Analyzes requirements and breaks them down
-- Creates a comprehensive test list
+- **Writes a comprehensive test list** (stored as a file or document)
+- Marks tests as pending/completed in the list
 - **Commits** the test list (if changes were made)
-- **Handoff →** Test Agent
+- **Handoff →** Passes the **next pending test** to the Test Agent
 
 ### 2. Test Agent (Red Phase)
-- Receives the test list
-- Writes failing tests based on the test list
-- Ensures tests are focused and well-structured
-- **Commits** the failing tests
+- Receives **one test** from the test list (the next pending test)
+- Writes a failing test for that **single test case**
+- Ensures the test is focused and well-structured
+- **Commits** the failing test
 - **Handoff →** Implementing Agent
 
 ### 3. Implementing Agent (Green Phase)
-- Receives failing tests
-- Writes minimum code to make tests pass
+- Receives the single failing test
+- Writes minimum code to make **that test** pass
 - Focuses on functionality, not perfection
 - **Commits** the passing implementation
 - **Handoff →** Review Agent
@@ -32,23 +33,24 @@ Four sessions of the same coding agent collaborate in a Test-Driven Development 
 - Refactors code while keeping tests green
 - Improves code quality, readability, and maintainability
 - **Commits** the refactored code
-- **Handoff →** Test List Agent (for next test selection)
+- **Handoff →** Test List Agent (to get the next test from the list)
 
 ## The TDD Process Philosophy
 
 Although the three steps—often summarized as **Red - Green - Refactor**—are the heart of the process, there's also a vital initial step where we write out a list of test cases first. We then pick one of these tests, apply red-green-refactor to it, and once we're done pick the next.
 
 **Key principles:**
+- **One test at a time**: Each agent receives exactly ONE test from the list, not the entire list
 - **Sequencing tests properly is a skill**: We want to pick tests that drive us quickly to the salient points in the design
 - **The test list is dynamic**: During the process, we should add more tests to our list as they occur to us
 - **Iterative refinement**: Each completed cycle informs the next test selection
 
 This means the **Test List Agent** runs not only at the start, but also **after each red-green-refactor cycle** to:
 1. Review the current test list
-2. Evaluate which tests have been completed
+2. Mark the completed test as done
 3. Add any new tests discovered during implementation
-4. Select the next most valuable test to implement
-5. Hand off to the Test Agent for the next cycle
+4. **Select the next pending test** from the list
+5. Hand off **that single test** to the Test Agent for the next cycle
 
 ## Workflow Diagram
 
@@ -123,11 +125,11 @@ This means the **Test List Agent** runs not only at the start, but also **after 
 
 ## Iterative TDD Cycle Diagram
 
-The following diagram shows how the Test List Agent is revisited after each Red-Green-Refactor cycle to select the next test:
+The following diagram shows how the Test List Agent writes a test list and passes tests **one by one** to subsequent agents:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                    ITERATIVE TDD CYCLE WITH TEST PLANNING                   │
+│              ONE TEST AT A TIME: ITERATIVE TDD CYCLE                        │
 └─────────────────────────────────────────────────────────────────────────────┘
 
                          ┌──────────────┐
@@ -139,15 +141,18 @@ The following diagram shows how the Test List Agent is revisited after each Red-
               ┌─────────────────────────────────────┐
               │         TEST LIST AGENT             │
               │  ┌───────────────────────────────┐  │
-              │  │ □ Test case 1                 │  │
-              │  │ □ Test case 2                 │  │
-              │  │ □ Test case 3                 │  │
+              │  │ ✓ Test case 1 (completed)     │  │
+              │  │ ► Test case 2 (next)  ◄───────│──│── PASSES THIS ONE TEST
+              │  │ □ Test case 3 (pending)       │  │
               │  │ □ ...more tests as discovered │  │
               │  └───────────────────────────────┘  │
               │                                     │
-              │  ► Select next most valuable test   │
-              │  ► Add new tests as they occur      │
+              │  ► Writes/updates the test list     │
+              │  ► Selects NEXT PENDING test        │
+              │  ► Passes ONE test to Test Agent    │
               └──────────────────┬──────────────────┘
+                                 │
+                          (next test)
                                  │
                                  ▼
                           [COMMIT: Plan]
@@ -157,7 +162,8 @@ The following diagram shows how the Test List Agent is revisited after each Red-
          │         ┌─────────────────────────┐           │
          │         │      TEST AGENT         │           │
          │         │    🔴 RED PHASE         │           │
-         │         │  (Write failing test)   │           │
+         │         │ Receives: ONE test      │           │
+         │         │ (Write failing test)    │           │
          │         └───────────┬─────────────┘           │
          │                     │                         │
          │                     ▼                         │
@@ -167,7 +173,7 @@ The following diagram shows how the Test List Agent is revisited after each Red-
          │         ┌─────────────────────────┐           │
          │         │  IMPLEMENTING AGENT     │           │
          │         │    🟢 GREEN PHASE       │           │
-         │         │  (Make test pass)       │           │
+         │         │  (Make ONE test pass)   │           │
          │         └───────────┬─────────────┘           │
          │                     │                         │
          │                     ▼                         │
@@ -186,7 +192,7 @@ The following diagram shows how the Test List Agent is revisited after each Red-
          │                     ▼                         │
          │            ┌────────────────┐                 │
          │            │  More tests    │─── No ──►  DONE │
-         │            │  remaining?    │                 │
+         │            │  in the list?  │                 │
          │            └────────┬───────┘                 │
          │                     │                         │
          │                    Yes                        │
@@ -194,28 +200,52 @@ The following diagram shows how the Test List Agent is revisited after each Red-
          └─────────────────────┘                         │
                                                          │
                  LOOP BACK TO TEST LIST AGENT            │
-                 (Review list, add new tests,            │
-                  select next test)                      │
+                 (Mark test done, update list,           │
+                  get NEXT test from list)               │
                                                          │
 ─────────────────────────────────────────────────────────┘
 ```
 
-### The Iterative Process
+### The Iterative Process (One Test at a Time)
 
 ```
     ╔═══════════════════════════════════════════════════════════════════╗
     ║                                                                   ║
     ║   📋 PLAN ──► 🔴 RED ──► 🟢 GREEN ──► 🔵 REFACTOR ──┐            ║
-    ║      ▲                                              │             ║
+    ║      ▲         (1 test)   (1 test)     (1 test)     │            ║
     ║      │                                              │             ║
     ║      │         ┌──────────────────────┐             │             ║
-    ║      └─────────│  More tests to do?   │◄────────────┘             ║
-    ║                │  Add discovered tests│                           ║
-    ║                │  Pick next test      │                           ║
+    ║      └─────────│  More tests in list? │◄────────────┘             ║
+    ║                │  Mark current done   │                           ║
+    ║                │  Get NEXT test       │                           ║
     ║                └──────────────────────┘                           ║
     ║                                                                   ║
     ╚═══════════════════════════════════════════════════════════════════╝
 ```
+
+## Test List Format
+
+The Test List Agent writes and maintains a test list file. Each test in the list has a status:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         TEST LIST EXAMPLE                           │
+├─────────────────────────────────────────────────────────────────────┤
+│  Status │ Test Description                                          │
+├─────────┼───────────────────────────────────────────────────────────┤
+│   [x]   │ Returns empty array for empty input                       │
+│   [x]   │ Returns single element for single-item array              │
+│   [ ]   │ Sorts two elements in ascending order        ◄── NEXT     │
+│   [ ]   │ Handles duplicate values                                  │
+│   [ ]   │ Sorts negative numbers correctly                          │
+│   [ ]   │ (new tests added as discovered during implementation)     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Handoff mechanism:**
+- Test List Agent selects the **first unchecked** `[ ]` test
+- Passes **only that one test** to the Test Agent
+- After the cycle completes, marks it as `[x]` and selects the next
 
 ## Commit Structure
 
