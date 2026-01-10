@@ -274,3 +274,8 @@ This ensures:
 - **Quality Assurance**: Tests written before implementation
 - **Clean Code**: Dedicated refactoring phase ensures maintainability
 - **Traceability**: Clear handoffs between phases
+
+## Related Specifications
+
+- [Handoffs Specification](spec-handoffs.md) - Agent context, information access, and handoff mechanisms
+- [Error Handling Specification](spec-error-handling.md) - Failure scenarios and recovery strategies
