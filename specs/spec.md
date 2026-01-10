@@ -35,9 +35,9 @@ Four **independent Claude Code sessions** collaborate in a Test-Driven Developme
 - Writes minimum code to make **that test** pass
 - Focuses on functionality, not perfection
 - **Commits** the passing implementation
-- **Handoff →** Review Agent
+- **Handoff →** Refactor Agent
 
-### 4. Review Agent (Refactor Phase)
+### 4. Refactor Agent (Refactor Phase)
 - Reviews the implementation
 - Refactors code while keeping tests green
 - Improves code quality, readability, and maintainability
@@ -70,7 +70,7 @@ Each agent has specific test execution responsibilities to ensure the TDD cycle 
 | **Test List Agent** | No | — |
 | **Test Agent** | Yes, all tests | All pass **except** the new test (which must fail) |
 | **Implementing Agent** | Yes, all tests | All tests pass (including the new one) |
-| **Review Agent** | Yes, all tests | All tests pass (unchanged after refactoring) |
+| **Refactor Agent** | Yes, all tests | All tests pass (unchanged after refactoring) |
 
 **Key principle**: All tests created since the start of the workflow must pass (except during the Red phase for the new test).
 
@@ -116,7 +116,7 @@ Each agent has specific test execution responsibilities to ensure the TDD cycle 
            │
            ▼
 ┌─────────────────────┐
-│   REVIEW AGENT      │  ← 🔵 REFACTOR
+│   REFACTOR AGENT      │  ← 🔵 REFACTOR
 │ (Improves code)     │
 └──────────┬──────────┘
            │
@@ -203,7 +203,7 @@ The following diagram shows how the Test List Agent writes a test list and passe
          │                     │                         │
          │                     ▼                         │
          │         ┌─────────────────────────┐           │
-         │         │    REVIEW AGENT         │           │
+         │         │    REFACTOR AGENT         │           │
          │         │   🔵 REFACTOR PHASE     │           │
          │         │   (Improve code)        │           │
          │         └───────────┬─────────────┘           │
@@ -280,7 +280,7 @@ Each TDD cycle produces **four commits**, one from each agent:
 │  1. 📋 PLAN COMMIT     │  Test List Agent commits test list         │
 │  2. 🔴 RED COMMIT      │  Test Agent commits failing tests          │
 │  3. 🟢 GREEN COMMIT    │  Implementing Agent commits passing code   │
-│  4. 🔵 REFACTOR COMMIT │  Review Agent commits refactored code      │
+│  4. 🔵 REFACTOR COMMIT │  Refactor Agent commits refactored code      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
