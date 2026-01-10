@@ -45,3 +45,10 @@ Since each agent runs as an independent Claude Code session (no shared memory), 
 - Is git the only shared state mechanism?
 - Should there be a handoff file (e.g., `.handoff.json`) in the repository?
 - How does a session know what the previous session accomplished?
+
+### Pre-existing Codebase
+
+- How does the workflow handle existing codebases with existing tests?
+- Should the Test List Agent account for existing tests when planning?
+- Do existing tests count toward "all tests must pass"?
+- Is this workflow scoped to new features only, or can it modify existing functionality?
