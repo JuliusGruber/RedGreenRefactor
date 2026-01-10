@@ -86,9 +86,21 @@ Four sessions of the same coding agent collaborate in a Test-Driven Development 
     └────────────────────────────────────────────────────┘
 ```
 
+## Agent Platform
+
+### Current Implementation
+- **Claude** (Anthropic) - All four agent roles are currently powered by Claude
+
+### Future Roadmap
+- **Codex** (OpenAI) - Planned support
+- **Gemini** (Google) - Planned support
+
+The architecture is designed to be model-agnostic, allowing different AI providers to be swapped in for any of the agent roles.
+
 ## Benefits
 
 - **Separation of Concerns**: Each agent focuses on one task
 - **Quality Assurance**: Tests written before implementation
 - **Clean Code**: Dedicated refactoring phase ensures maintainability
 - **Traceability**: Clear handoffs between phases
+- **Flexibility**: Model-agnostic design supports multiple AI providers
