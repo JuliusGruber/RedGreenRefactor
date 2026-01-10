@@ -18,3 +18,7 @@
 - Who is responsible for detecting failures?
 - What is the rollback strategy?
 - Should the cycle restart from a previous agent, or abort entirely?
+
+### Edge Cases
+- What if the Test Agent writes a test that already exists (duplicate)?
+- What if the test list describes something already covered by an existing test?
