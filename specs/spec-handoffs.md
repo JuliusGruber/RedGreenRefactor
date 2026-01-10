@@ -4,6 +4,12 @@
 >
 > The handoff mechanism is a critical component that coordinates transitions between independent Claude Code sessions. This specification needs to be fully designed.
 
+## Design Decisions
+
+| Decision | Choice |
+|----------|--------|
+| Session persistence | **New session each time** - every agent invocation starts a fresh Claude Code session, even when the same role runs again (e.g., Test List Agent in each cycle) |
+
 ## Overview
 
 Since each agent runs as an independent Claude Code session (no shared memory), the handoff mechanism is essential for:
