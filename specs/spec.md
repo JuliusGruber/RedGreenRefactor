@@ -10,6 +10,7 @@ Four sessions of the same coding agent collaborate in a Test-Driven Development 
 - Receives a feature request
 - Analyzes requirements and breaks them down
 - Creates a comprehensive test list
+- **Commits** the test list (if changes were made)
 - **Handoff →** Test Agent
 
 ### 2. Test Agent (Red Phase)
@@ -68,6 +69,9 @@ This means the **Test List Agent** runs not only at the start, but also **after 
 └──────────┬──────────┘
            │
            ▼
+    [COMMIT 1: Plan]
+           │
+           ▼
 ┌─────────────────────┐
 │    TEST AGENT       │  ← 🔴 RED
 │ (Writes failing     │
@@ -75,7 +79,7 @@ This means the **Test List Agent** runs not only at the start, but also **after 
 └──────────┬──────────┘
            │
            ▼
-     [COMMIT 1: Red]
+     [COMMIT 2: Red]
            │
            ▼
 ┌─────────────────────┐
@@ -84,7 +88,7 @@ This means the **Test List Agent** runs not only at the start, but also **after 
 └──────────┬──────────┘
            │
            ▼
-    [COMMIT 2: Green]
+    [COMMIT 3: Green]
            │
            ▼
 ┌─────────────────────┐
@@ -93,7 +97,7 @@ This means the **Test List Agent** runs not only at the start, but also **after 
 └──────────┬──────────┘
            │
            ▼
-  [COMMIT 3: Refactor]
+  [COMMIT 4: Refactor]
            │
            ▼
     ┌──────────────┐
@@ -110,9 +114,9 @@ This means the **Test List Agent** runs not only at the start, but also **after 
     │      │           │            │              │               │
     │   Test List    Failing     Passing       Improved           │
     │    Agent        Tests       Tests          Code             │
-    │                   │            │              │               │
-    │                   ▼            ▼              ▼               │
-    │               COMMIT 1     COMMIT 2      COMMIT 3           │
+    │      │           │            │              │               │
+    │      ▼           ▼            ▼              ▼               │
+    │   COMMIT 1   COMMIT 2     COMMIT 3      COMMIT 4            │
     │                                                              │
     └──────────────────────────────────────────────────────────────┘
 ```
@@ -144,6 +148,9 @@ The following diagram shows how the Test List Agent is revisited after each Red-
               │  ► Select next most valuable test   │
               │  ► Add new tests as they occur      │
               └──────────────────┬──────────────────┘
+                                 │
+                                 ▼
+                          [COMMIT: Plan]
                                  │
          ┌───────────────────────┼───────────────────────┐
          │                       ▼                       │
@@ -212,15 +219,16 @@ The following diagram shows how the Test List Agent is revisited after each Red-
 
 ## Commit Structure
 
-Each TDD cycle produces **three commits**, one from each active agent:
+Each TDD cycle produces **four commits**, one from each agent:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                     COMMITS PER TDD CYCLE                           │
 ├─────────────────────────────────────────────────────────────────────┤
-│  1. 🔴 RED COMMIT      │  Test Agent commits failing tests          │
-│  2. 🟢 GREEN COMMIT    │  Implementing Agent commits passing code   │
-│  3. 🔵 REFACTOR COMMIT │  Review Agent commits refactored code      │
+│  1. 📋 PLAN COMMIT     │  Test List Agent commits test list         │
+│  2. 🔴 RED COMMIT      │  Test Agent commits failing tests          │
+│  3. 🟢 GREEN COMMIT    │  Implementing Agent commits passing code   │
+│  4. 🔵 REFACTOR COMMIT │  Review Agent commits refactored code      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
