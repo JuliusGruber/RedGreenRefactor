@@ -39,9 +39,10 @@ Four **independent Claude Code sessions** collaborate in a Test-Driven Developme
 
 ### 4. Refactor Agent (Refactor Phase)
 - Reviews the implementation
-- Refactors code while keeping tests green
+- Refactors **both test and implementation code** while keeping tests green
+- May refactor any code in the codebase, not just the current cycle's changes
 - Improves code quality, readability, and maintainability
-- **Commits** the refactored code
+- **Commits** the refactored code (or empty commit if no refactoring needed)
 - **Handoff →** Test List Agent (to get the next test from the list)
 
 ## The TDD Process Philosophy
