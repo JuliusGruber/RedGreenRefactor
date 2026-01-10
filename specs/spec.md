@@ -31,7 +31,23 @@ Four sessions of the same coding agent collaborate in a Test-Driven Development 
 - Refactors code while keeping tests green
 - Improves code quality, readability, and maintainability
 - **Commits** the refactored code
-- Cycle complete ✓
+- **Handoff →** Test List Agent (for next test selection)
+
+## The TDD Process Philosophy
+
+Although the three steps—often summarized as **Red - Green - Refactor**—are the heart of the process, there's also a vital initial step where we write out a list of test cases first. We then pick one of these tests, apply red-green-refactor to it, and once we're done pick the next.
+
+**Key principles:**
+- **Sequencing tests properly is a skill**: We want to pick tests that drive us quickly to the salient points in the design
+- **The test list is dynamic**: During the process, we should add more tests to our list as they occur to us
+- **Iterative refinement**: Each completed cycle informs the next test selection
+
+This means the **Test List Agent** runs not only at the start, but also **after each red-green-refactor cycle** to:
+1. Review the current test list
+2. Evaluate which tests have been completed
+3. Add any new tests discovered during implementation
+4. Select the next most valuable test to implement
+5. Hand off to the Test Agent for the next cycle
 
 ## Workflow Diagram
 
@@ -99,6 +115,99 @@ Four sessions of the same coding agent collaborate in a Test-Driven Development 
     │               COMMIT 1     COMMIT 2      COMMIT 3           │
     │                                                              │
     └──────────────────────────────────────────────────────────────┘
+```
+
+## Iterative TDD Cycle Diagram
+
+The following diagram shows how the Test List Agent is revisited after each Red-Green-Refactor cycle to select the next test:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    ITERATIVE TDD CYCLE WITH TEST PLANNING                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                         ┌──────────────┐
+                         │   FEATURE    │
+                         │   REQUEST    │
+                         └──────┬───────┘
+                                │
+                                ▼
+              ┌─────────────────────────────────────┐
+              │         TEST LIST AGENT             │
+              │  ┌───────────────────────────────┐  │
+              │  │ □ Test case 1                 │  │
+              │  │ □ Test case 2                 │  │
+              │  │ □ Test case 3                 │  │
+              │  │ □ ...more tests as discovered │  │
+              │  └───────────────────────────────┘  │
+              │                                     │
+              │  ► Select next most valuable test   │
+              │  ► Add new tests as they occur      │
+              └──────────────────┬──────────────────┘
+                                 │
+         ┌───────────────────────┼───────────────────────┐
+         │                       ▼                       │
+         │         ┌─────────────────────────┐           │
+         │         │      TEST AGENT         │           │
+         │         │    🔴 RED PHASE         │           │
+         │         │  (Write failing test)   │           │
+         │         └───────────┬─────────────┘           │
+         │                     │                         │
+         │                     ▼                         │
+         │              [COMMIT: Red]                    │
+         │                     │                         │
+         │                     ▼                         │
+         │         ┌─────────────────────────┐           │
+         │         │  IMPLEMENTING AGENT     │           │
+         │         │    🟢 GREEN PHASE       │           │
+         │         │  (Make test pass)       │           │
+         │         └───────────┬─────────────┘           │
+         │                     │                         │
+         │                     ▼                         │
+         │             [COMMIT: Green]                   │
+         │                     │                         │
+         │                     ▼                         │
+         │         ┌─────────────────────────┐           │
+         │         │    REVIEW AGENT         │           │
+         │         │   🔵 REFACTOR PHASE     │           │
+         │         │   (Improve code)        │           │
+         │         └───────────┬─────────────┘           │
+         │                     │                         │
+         │                     ▼                         │
+         │           [COMMIT: Refactor]                  │
+         │                     │                         │
+         │                     ▼                         │
+         │            ┌────────────────┐                 │
+         │            │  More tests    │─── No ──►  DONE │
+         │            │  remaining?    │                 │
+         │            └────────┬───────┘                 │
+         │                     │                         │
+         │                    Yes                        │
+         │                     │                         │
+         └─────────────────────┘                         │
+                                                         │
+                 LOOP BACK TO TEST LIST AGENT            │
+                 (Review list, add new tests,            │
+                  select next test)                      │
+                                                         │
+─────────────────────────────────────────────────────────┘
+```
+
+### The Iterative Process
+
+```
+    ╔═══════════════════════════════════════════════════════════════════╗
+    ║                                                                   ║
+    ║   📋 PLAN ──► 🔴 RED ──► 🟢 GREEN ──► 🔵 REFACTOR ──┐            ║
+    ║      ▲                                              │             ║
+    ║      │                                              │             ║
+    ║      │         ┌──────────────────────┐             │             ║
+    ║      └─────────│  More tests to do?   │◄────────────┘             ║
+    ║                │  Add discovered tests│                           ║
+    ║                │  Pick next test      │                           ║
+    ║                └──────────────────────┘                           ║
+    ║                                                                   ║
+    ╚═══════════════════════════════════════════════════════════════════╝
 ```
 
 ## Commit Structure
