@@ -52,6 +52,19 @@ This means the **Test List Agent** runs not only at the start, but also **after 
 4. **Select the next pending test** from the list
 5. Hand off **that single test** to the Test Agent for the next cycle
 
+## Test Execution Responsibilities
+
+Each agent has specific test execution responsibilities to ensure the TDD cycle integrity:
+
+| Agent | Runs Tests | Expected Result |
+|-------|------------|-----------------|
+| **Test List Agent** | No | — |
+| **Test Agent** | Yes, all tests | All pass **except** the new test (which must fail) |
+| **Implementing Agent** | Yes, all tests | All tests pass (including the new one) |
+| **Review Agent** | Yes, all tests | All tests pass (unchanged after refactoring) |
+
+**Key principle**: All tests created since the start of the workflow must pass (except during the Red phase for the new test).
+
 ## Workflow Diagram
 
 ```
