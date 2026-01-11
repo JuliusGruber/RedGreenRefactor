@@ -388,134 +388,18 @@ public class TDDTools {
 
 ---
 
-## 3. Handoff Implementation Strategies
+## 3. Chosen Handoff Approach
 
-### 3.1 Strategy A: Filesystem + State File (Recommended)
-
-Use a `.tdd-state.json` file as the coordination mechanism:
-
-```json
-{
-  "feature": "user-authentication",
-  "current_cycle": 3,
-  "current_phase": "green",
-  "test_list_file": "tests/test-list-user-auth.md",
-  "current_test": {
-    "description": "User can log in with valid credentials",
-    "test_file": "tests/test_user_login.py",
-    "impl_file": "src/auth/login.py"
-  },
-  "completed_tests": [
-    "User model exists with email and password_hash",
-    "Password can be hashed and verified"
-  ],
-  "pending_tests": [
-    "User can log out",
-    "Invalid credentials return error"
-  ],
-  "last_phase_result": {
-    "phase": "red",
-    "success": true,
-    "commit": "abc123",
-    "errors": []
-  }
-}
-```
-
-### 3.2 State Management in Java
-
-```java
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.JsonNode;
-import java.nio.file.Path;
-import java.nio.file.Files;
-
-public class TDDState {
-    private static final ObjectMapper mapper = new ObjectMapper();
-
-    public record CurrentTest(
-        String description,
-        String testFile,
-        String implFile
-    ) {}
-
-    public record PhaseResult(
-        String phase,
-        boolean success,
-        String commit,
-        List<String> errors
-    ) {}
-
-    private String feature;
-    private int currentCycle;
-    private String currentPhase;
-    private String testListFile;
-    private CurrentTest currentTest;
-    private List<String> completedTests;
-    private List<String> pendingTests;
-    private PhaseResult lastPhaseResult;
-
-    public static TDDState load(Path stateFile) throws Exception {
-        if (Files.exists(stateFile)) {
-            return mapper.readValue(stateFile.toFile(), TDDState.class);
-        }
-        return new TDDState();
-    }
-
-    public void save(Path stateFile) throws Exception {
-        mapper.writerWithDefaultPrettyPrinter()
-              .writeValue(stateFile.toFile(), this);
-    }
-
-    // Getters and setters omitted for brevity
-}
-```
-
-### 3.3 Filesystem Handoff Flow
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    FILESYSTEM HANDOFF FLOW                           │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  1. Test List Agent                                                  │
-│     ├─ Reads: feature request                                        │
-│     ├─ Writes: test-list.md, .tdd-state.json                        │
-│     └─ Commits: "plan: add test list for user-auth"                 │
-│                           │                                          │
-│                           ▼                                          │
-│  2. Test Agent                                                       │
-│     ├─ Reads: .tdd-state.json (gets current_test)                   │
-│     ├─ Writes: test file                                            │
-│     ├─ Runs: tests (verifies failure)                               │
-│     ├─ Updates: .tdd-state.json (phase: "red" → complete)           │
-│     └─ Commits: "test: add failing test for login"                  │
-│                           │                                          │
-│                           ▼                                          │
-│  3. Implementing Agent                                               │
-│     ├─ Reads: .tdd-state.json, test file                            │
-│     ├─ Writes: implementation                                        │
-│     ├─ Runs: tests (verifies passing)                               │
-│     ├─ Updates: .tdd-state.json (phase: "green" → complete)         │
-│     └─ Commits: "feat: implement login"                             │
-│                           │                                          │
-│                           ▼                                          │
-│  4. Refactor Agent                                                   │
-│     ├─ Reads: .tdd-state.json, test file, impl file                 │
-│     ├─ Edits: code as needed                                        │
-│     ├─ Runs: tests (verifies still passing)                         │
-│     ├─ Updates: .tdd-state.json (cycle complete)                    │
-│     └─ Commits: "refactor: clean up login implementation"           │
-│                           │                                          │
-│                           ▼                                          │
-│  5. Back to Test List Agent (next cycle)                            │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
-```
+> **Decision**: The handoff mechanism uses **Anthropic SDK + Git Commits + Git Notes**.
+>
+> See [spec-handoffs.md](spec-handoffs.md) for the full specification of the chosen approach.
+> See [research-java-sdk-git-notes.md](research-java-sdk-git-notes.md) for detailed Java implementation with Git Notes.
 
 ---
 
 ## 4. Implementation Patterns
+
+> **Note**: The orchestrator examples below reference `.tdd-state.json` for illustration. The actual implementation uses **Git Notes** for state management. See [research-java-sdk-git-notes.md](research-java-sdk-git-notes.md) for the authoritative Git Notes implementation.
 
 ### 4.1 Java Orchestrator (Full Example)
 
@@ -1074,25 +958,28 @@ public class RetryHandler {
 
 ### 7.1 For This Project (RedGreenRefactor)
 
-**Recommended approach: Filesystem + Manual Orchestration**
+**Chosen approach: Anthropic SDK + Git Commits + Git Notes**
 
 1. **Use Anthropic Java SDK** for API calls to Claude
-2. **Build orchestration layer** manually (as shown in TDDOrchestrator)
-3. **Use `.tdd-state.json`** for state persistence and handoff data
+2. **Build orchestration layer** manually with JGit for Git Notes
+3. **Use Git Notes** for state persistence and handoff data
 4. **Use git commits** for atomic phase completion markers
 5. **Use tool restrictions** via selective tool lists per agent
+
+See [spec-handoffs.md](spec-handoffs.md) for the full specification.
+See [research-java-sdk-git-notes.md](research-java-sdk-git-notes.md) for detailed Git Notes implementation.
 
 ### 7.2 Implementation Priority
 
 1. **Start simple**: Basic orchestrator with synchronous execution
-2. **Add state management**: TDDState class with JSON persistence
+2. **Add state management**: Git Notes via JGit for coordination
 3. **Add tool execution**: Implement each tool handler
 4. **Add error handling**: Retry logic with error context
 5. **Optimize later**: Streaming, async execution, parallel cycles
 
 ### 7.3 Key Success Factors
 
-- **Clear state file schema**: Define .tdd-state.json structure upfront
+- **Clear handoff state schema**: Define Git Notes structure upfront
 - **Explicit prompts**: Each agent gets full context in its prompt
 - **Tool restrictions**: Only provide necessary tools per agent
 - **Commit discipline**: Each phase commits before handoff
