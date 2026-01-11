@@ -1097,14 +1097,6 @@ public class AsyncTddOrchestrator {
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-| Aspect | Git Commits Provide | Git Notes Provide |
-|--------|---------------------|-------------------|
-| **Code Changes** | Actual diffs and file modifications | — |
-| **Phase State** | — | Current TDD phase and next action |
-| **Test Progress** | Test file changes | Test list status (pending/complete) |
-| **Context** | Implementation history | Orchestration metadata |
-| **Recovery** | Rollback targets | Error details and retry context |
-
 ---
 
 ## 10. Error Handling and Recovery
