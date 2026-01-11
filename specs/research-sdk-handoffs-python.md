@@ -163,13 +163,13 @@ Each agent receives only the tools needed for its phase:
 > **Decision**: The handoff mechanism uses **Anthropic SDK + Git Commits + Git Notes**.
 >
 > See [spec-handoffs.md](spec-handoffs.md) for the full specification of the chosen approach.
-> See [research-java-sdk-git-notes.md](research-java-sdk-git-notes.md) for detailed implementation research.
+> See [research-java-sdk.md](research-java-sdk.md) for detailed Java SDK implementation research.
 
 ---
 
 ## 4. Context Passing Mechanisms
 
-> **Note**: The examples below reference `.tdd-state.json` for illustration. The actual implementation uses **Git Notes** for state management. See [research-java-sdk-git-notes.md](research-java-sdk-git-notes.md) for the Git Notes implementation.
+> **Note**: The examples below reference `.tdd-state.json` for illustration. The actual implementation uses **Git Notes** for state management. See [research-java-sdk.md](research-java-sdk.md) for the Git Notes implementation.
 
 ### 4.1 What Context Each Agent Needs
 
@@ -243,7 +243,7 @@ async def update_tdd_state(args: dict) -> dict:
 
 ## 5. Implementation Patterns
 
-> **Note**: The orchestrator examples below reference `.tdd-state.json` for illustration. The actual implementation uses **Git Notes** for state management. See [research-java-sdk-git-notes.md](research-java-sdk-git-notes.md) for the authoritative Git Notes implementation.
+> **Note**: The orchestrator examples below reference `.tdd-state.json` for illustration. The actual implementation uses **Git Notes** for state management. See [research-java-sdk.md](research-java-sdk.md) for the authoritative Git Notes implementation.
 
 ### 5.1 Python Orchestrator (Full Example)
 

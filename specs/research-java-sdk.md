@@ -1,18 +1,19 @@
-# Hybrid Approach: Claude SDK (Java) + Git Notes for Agent Handoffs
+# Anthropic Java SDK for TDD Agent Handoffs
 
-> **Purpose**: In-depth research on combining the Anthropic Java SDK with Git Notes as a hybrid orchestration mechanism for the RedGreenRefactor TDD workflow.
+> **Purpose**: Comprehensive research on using the Anthropic Java SDK with Git Notes as a hybrid orchestration mechanism for the RedGreenRefactor TDD workflow.
 
 ## Executive Summary
 
-This research explores a **hybrid architecture** that combines:
+This document consolidates research on building a multi-agent TDD orchestrator using:
 1. **Anthropic Java SDK** - For invoking Claude agents with type-safe API calls
 2. **Git Notes** - For non-intrusive metadata-based inter-agent communication
+3. **JGit** - For programmatic Git Notes operations in Java
 
-This approach offers several unique advantages:
-- **Language ecosystem**: Java's mature ecosystem for enterprise-grade orchestration
-- **Git-native state**: Handoff metadata lives in the repository without polluting commit history
-- **Audit trail**: Complete traceability of agent handoffs alongside code evolution
-- **Decoupled architecture**: Agents communicate through the repository, not direct coupling
+**Key findings:**
+- The Java SDK provides core API access but requires manual orchestration logic (unlike Python SDK)
+- Tool use via JSON schemas enables agent-specific capabilities
+- Git Notes store handoff state without polluting commit history
+- Both synchronous and asynchronous execution patterns are supported
 
 ---
 
@@ -40,11 +41,11 @@ This approach offers several unique advantages:
 | **Human Readable** | Plain text or JSON, inspectable via command line |
 | **No External Dependencies** | Uses only Git - no Redis, databases, or message queues |
 
-### 1.3 Combined Synergy
+### 1.3 Combined Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                     HYBRID ARCHITECTURE OVERVIEW                              │
+│                     HYBRID ARCHITECTURE OVERVIEW                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │   ┌────────────────────────────────────────────────────────────────────┐    │
@@ -82,25 +83,103 @@ This approach offers several unique advantages:
 
 ---
 
-## 2. Anthropic Java SDK Deep Dive
+## 2. Java SDK Feature Verification
 
-### 2.1 SDK Installation
+The following table confirms which TDD workflow features are supported by the Anthropic Java SDK:
 
-**Maven (`pom.xml`):**
+| Feature | Supported | Implementation Notes |
+|---------|-----------|---------------------|
+| **Message Creation** | ✅ Yes | `MessageCreateParams.builder()` with model, maxTokens, messages |
+| **System Prompts** | ✅ Yes | `.system(String)` in MessageCreateParams |
+| **Tool Definitions** | ✅ Yes | `Tool.builder()` with JSON Schema input definition |
+| **Tool Use Responses** | ✅ Yes | `StopReason.TOOL_USE` detection, `ToolUseBlock` parsing |
+| **Tool Results** | ✅ Yes | `ToolResultBlockParam` for returning tool execution results |
+| **Streaming** | ✅ Yes | `StreamResponse<RawMessageStreamEvent>` with auto-close |
+| **Async Execution** | ✅ Yes | `CompletableFuture<Message>` via `.async()` |
+| **Model Selection** | ✅ Yes | `Model.CLAUDE_SONNET_4_20250514` enum |
+| **Conversation History** | ✅ Yes | List of `MessageParam` for multi-turn conversations |
+| **Beta Features** | ✅ Yes | `BetaTool`, `BetaMessage` for experimental features |
+
+### Features Requiring Manual Implementation
+
+Unlike the Python Claude Agent SDK, the following require custom code:
+
+| Feature | Python SDK | Java SDK Equivalent |
+|---------|------------|---------------------|
+| `AgentDefinition` class | Built-in | Custom record class |
+| `query()` function | Built-in | Manual message creation + tool loop |
+| Session ID tracking | Built-in | Manual state management |
+| Task tool (subagents) | Built-in | Manual orchestration pattern |
+| MCP tool decorators | `@tool` decorator | `Tool.builder()` with JSON Schema |
+| Async iteration | `async for msg in query()` | `CompletableFuture` chains |
+
+---
+
+## 3. SDK Installation & Setup
+
+### 3.1 Maven (`pom.xml`)
+
 ```xml
-<dependency>
-    <groupId>com.anthropic</groupId>
-    <artifactId>anthropic-java</artifactId>
-    <version>2.11.1</version>
-</dependency>
+<dependencies>
+    <!-- Anthropic Java SDK -->
+    <dependency>
+        <groupId>com.anthropic</groupId>
+        <artifactId>anthropic-java</artifactId>
+        <version>2.11.1</version>
+    </dependency>
+
+    <!-- JGit for Git Notes -->
+    <dependency>
+        <groupId>org.eclipse.jgit</groupId>
+        <artifactId>org.eclipse.jgit</artifactId>
+        <version>6.10.0.202406032230-r</version>
+    </dependency>
+
+    <!-- Jackson for JSON -->
+    <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>2.18.2</version>
+    </dependency>
+
+    <!-- SLF4J for logging -->
+    <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-simple</artifactId>
+        <version>2.0.9</version>
+    </dependency>
+</dependencies>
 ```
 
-**Gradle (`build.gradle.kts`):**
+### 3.2 Gradle (`build.gradle.kts`)
+
 ```kotlin
-implementation("com.anthropic:anthropic-java:2.11.1")
+plugins {
+    java
+    application
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
+dependencies {
+    implementation("com.anthropic:anthropic-java:2.11.1")
+    implementation("org.eclipse.jgit:org.eclipse.jgit:6.10.0.202406032230-r")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
+    implementation("org.slf4j:slf4j-simple:2.0.9")
+}
+
+application {
+    mainClass.set("com.redgreenrefactor.TDDOrchestrator")
+}
 ```
 
-### 2.2 Basic Client Setup
+**Requirements:** Java 8 or later (Java 17+ recommended)
+
+### 3.3 Basic Client Setup
 
 ```java
 import com.anthropic.client.AnthropicClient;
@@ -123,98 +202,290 @@ public class TddOrchestrator {
 }
 ```
 
-### 2.3 Agent Invocation Pattern
+---
 
-Each TDD agent is invoked as a separate API call with a specialized system prompt:
+## 4. Agent Architecture for TDD
+
+### 4.1 Session Models
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│                    SESSION MODELS COMPARISON                        │
+├────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  OPTION A: Independent Sessions (Recommended)                       │
+│  ─────────────────────────────────────────────────────────────────  │
+│                                                                     │
+│    Session 1          Session 2          Session 3          Session 4
+│    ┌─────────┐        ┌─────────┐        ┌─────────┐        ┌─────────┐
+│    │ Test    │   →    │ Test    │   →    │ Impl    │   →    │ Refactor│
+│    │ List    │ notes  │ Agent   │ notes  │ Agent   │ notes  │ Agent   │
+│    │ Agent   │        │         │        │         │        │         │
+│    └─────────┘        └─────────┘        └─────────┘        └─────────┘
+│         ↓                  ↓                  ↓                  ↓
+│    Fresh context      Fresh context      Fresh context      Fresh context
+│                                                                     │
+│  OPTION B: Conversation Continuity (Not recommended)                │
+│  ─────────────────────────────────────────────────────────────────  │
+│    Context grows: 100% → 150% → 200% → 250% of original             │
+│                                                                     │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+**Recommendation**: Use **Option A (Independent Sessions)** with explicit context passing via Git Notes.
+
+### 4.2 Defining the Four Agents
 
 ```java
-public class TddAgent {
-    private final AnthropicClient client;
-    private final String systemPrompt;
-    private final Model model;
+public record AgentDefinition(
+    String name,
+    String description,
+    String systemPrompt,
+    List<Tool> allowedTools,
+    Model model
+) {}
 
-    public TddAgent(AnthropicClient client, String systemPrompt, Model model) {
-        this.client = client;
-        this.systemPrompt = systemPrompt;
-        this.model = model;
-    }
+public AgentDefinition testListAgent() {
+    return new AgentDefinition(
+        "test-list-agent",
+        "Planning specialist that creates and maintains the test list",
+        """
+        You are the Test List Agent in a TDD workflow.
 
-    public Message invoke(String taskPrompt) {
-        MessageCreateParams params = MessageCreateParams.builder()
-            .model(model)
-            .maxTokens(4096L)
-            .system(systemPrompt)
-            .addUserMessage(taskPrompt)
-            .build();
+        Your responsibilities:
+        1. Analyze feature requirements
+        2. Create/update the test list file (test-list.md)
+        3. Select the next pending test
+        4. Determine when the feature is complete
 
-        return client.messages().create(params);
-    }
+        You DO NOT write actual test code—only plan tests.
+
+        Output your selected test in a JSON block:
+        ```json
+        {"test": "description of the test", "complete": false}
+        ```
+        """,
+        List.of(createReadTool(), createWriteTool(), createGlobTool(), createGrepTool()),
+        Model.CLAUDE_SONNET_4_20250514
+    );
+}
+
+public AgentDefinition testAgent() {
+    return new AgentDefinition(
+        "test-agent",
+        "Red phase specialist that writes failing tests",
+        """
+        You are the Test Agent (Red Phase) in a TDD workflow.
+
+        Your responsibilities:
+        1. Receive ONE test case description
+        2. Write a failing test for that case
+        3. The test must compile but FAIL when run
+
+        Write minimal, focused tests. Commit with message starting with "test:".
+        """,
+        List.of(createReadTool(), createWriteTool(), createBashTool()),
+        Model.CLAUDE_SONNET_4_20250514
+    );
+}
+
+public AgentDefinition implementingAgent() {
+    return new AgentDefinition(
+        "implementing-agent",
+        "Green phase specialist that makes tests pass",
+        """
+        You are the Implementing Agent (Green Phase) in a TDD workflow.
+
+        Your responsibilities:
+        1. Read the failing test
+        2. Write MINIMUM code to make it pass
+        3. Ensure all tests pass
+
+        Do NOT over-engineer. Write just enough code.
+        Commit with message starting with "feat:" or "fix:".
+        """,
+        List.of(createReadTool(), createWriteTool(), createEditTool(), createBashTool()),
+        Model.CLAUDE_SONNET_4_20250514
+    );
+}
+
+public AgentDefinition refactorAgent() {
+    return new AgentDefinition(
+        "refactor-agent",
+        "Refactor phase specialist that improves code quality",
+        """
+        You are the Refactor Agent in a TDD workflow.
+
+        Your responsibilities:
+        1. Review implementation AND test code
+        2. Refactor for clarity, maintainability
+        3. Ensure all tests still pass
+
+        May refactor any code in the codebase.
+        Commit with message starting with "refactor:".
+        """,
+        List.of(createReadTool(), createEditTool(), createBashTool(), createGrepTool()),
+        Model.CLAUDE_SONNET_4_20250514
+    );
 }
 ```
 
-### 2.4 Streaming for Real-Time Feedback
+### 4.3 Tool Restrictions Matrix
+
+| Agent | read_file | write_file | edit_file | bash | glob | grep |
+|-------|-----------|------------|-----------|------|------|------|
+| Test List | ✓ | ✓ | | | ✓ | ✓ |
+| Test | ✓ | ✓ | | ✓ | | |
+| Implementing | ✓ | ✓ | ✓ | ✓ | | |
+| Refactor | ✓ | | ✓ | ✓ | | ✓ |
+
+**Rationale:**
+- **Test List Agent**: Plans only, no code execution
+- **Test Agent**: Writes new files (tests), runs tests to verify failure
+- **Implementing Agent**: Can create new files OR edit existing ones
+- **Refactor Agent**: Edit only (no creating new files), can search for patterns
+
+---
+
+## 5. Tool Definitions via JSON Schema
 
 ```java
-import com.anthropic.core.http.StreamResponse;
-import com.anthropic.models.messages.RawMessageStreamEvent;
-import com.anthropic.helpers.MessageAccumulator;
+import com.anthropic.models.messages.Tool;
+import com.anthropic.core.JsonValue;
 
-public Message invokeWithStreaming(String taskPrompt, Consumer<String> onToken) {
-    MessageCreateParams params = MessageCreateParams.builder()
-        .model(Model.CLAUDE_SONNET_4_20250514)
-        .maxTokens(4096L)
-        .system(systemPrompt)
-        .addUserMessage(taskPrompt)
-        .build();
+public class TDDTools {
 
-    MessageAccumulator accumulator = MessageAccumulator.create();
-
-    try (StreamResponse<RawMessageStreamEvent> stream =
-            client.messages().createStreaming(params)) {
-
-        stream.stream()
-            .peek(accumulator::accumulate)
-            .flatMap(event -> event.contentBlockDelta().stream())
-            .flatMap(delta -> delta.delta().text().stream())
-            .forEach(textDelta -> onToken.accept(textDelta.text()));
-    }
-
-    return accumulator.message();
-}
-```
-
-### 2.5 Async Agent Orchestration
-
-```java
-import com.anthropic.client.AnthropicClientAsync;
-import com.anthropic.client.okhttp.AnthropicOkHttpClientAsync;
-import java.util.concurrent.CompletableFuture;
-
-public class AsyncTddOrchestrator {
-    private final AnthropicClientAsync client;
-
-    public AsyncTddOrchestrator() {
-        this.client = AnthropicOkHttpClientAsync.fromEnv();
-    }
-
-    public CompletableFuture<Message> invokeAgentAsync(String systemPrompt, String task) {
-        MessageCreateParams params = MessageCreateParams.builder()
-            .model(Model.CLAUDE_SONNET_4_20250514)
-            .maxTokens(4096L)
-            .system(systemPrompt)
-            .addUserMessage(task)
+    public static Tool createReadTool() {
+        return Tool.builder()
+            .name("read_file")
+            .description("Read the contents of a file")
+            .inputSchema(Tool.InputSchema.builder()
+                .type(JsonValue.Type.OBJECT)
+                .putAdditionalProperty("type", JsonValue.from("object"))
+                .putAdditionalProperty("properties", JsonValue.from(Map.of(
+                    "file_path", Map.of(
+                        "type", "string",
+                        "description", "The absolute path to the file to read"
+                    )
+                )))
+                .putAdditionalProperty("required", JsonValue.from(List.of("file_path")))
+                .build())
             .build();
+    }
 
-        return client.messages().create(params);
+    public static Tool createWriteTool() {
+        return Tool.builder()
+            .name("write_file")
+            .description("Write content to a file")
+            .inputSchema(Tool.InputSchema.builder()
+                .type(JsonValue.Type.OBJECT)
+                .putAdditionalProperty("type", JsonValue.from("object"))
+                .putAdditionalProperty("properties", JsonValue.from(Map.of(
+                    "file_path", Map.of(
+                        "type", "string",
+                        "description", "The absolute path to the file"
+                    ),
+                    "content", Map.of(
+                        "type", "string",
+                        "description", "The content to write"
+                    )
+                )))
+                .putAdditionalProperty("required", JsonValue.from(List.of("file_path", "content")))
+                .build())
+            .build();
+    }
+
+    public static Tool createEditTool() {
+        return Tool.builder()
+            .name("edit_file")
+            .description("Edit a file by replacing text")
+            .inputSchema(Tool.InputSchema.builder()
+                .type(JsonValue.Type.OBJECT)
+                .putAdditionalProperty("type", JsonValue.from("object"))
+                .putAdditionalProperty("properties", JsonValue.from(Map.of(
+                    "file_path", Map.of(
+                        "type", "string",
+                        "description", "The absolute path to the file"
+                    ),
+                    "old_text", Map.of(
+                        "type", "string",
+                        "description", "The text to replace"
+                    ),
+                    "new_text", Map.of(
+                        "type", "string",
+                        "description", "The replacement text"
+                    )
+                )))
+                .putAdditionalProperty("required", JsonValue.from(List.of("file_path", "old_text", "new_text")))
+                .build())
+            .build();
+    }
+
+    public static Tool createBashTool() {
+        return Tool.builder()
+            .name("bash")
+            .description("Execute a bash command")
+            .inputSchema(Tool.InputSchema.builder()
+                .type(JsonValue.Type.OBJECT)
+                .putAdditionalProperty("type", JsonValue.from("object"))
+                .putAdditionalProperty("properties", JsonValue.from(Map.of(
+                    "command", Map.of(
+                        "type", "string",
+                        "description", "The bash command to execute"
+                    )
+                )))
+                .putAdditionalProperty("required", JsonValue.from(List.of("command")))
+                .build())
+            .build();
+    }
+
+    public static Tool createGlobTool() {
+        return Tool.builder()
+            .name("glob")
+            .description("Find files matching a glob pattern")
+            .inputSchema(Tool.InputSchema.builder()
+                .type(JsonValue.Type.OBJECT)
+                .putAdditionalProperty("type", JsonValue.from("object"))
+                .putAdditionalProperty("properties", JsonValue.from(Map.of(
+                    "pattern", Map.of(
+                        "type", "string",
+                        "description", "The glob pattern to match"
+                    )
+                )))
+                .putAdditionalProperty("required", JsonValue.from(List.of("pattern")))
+                .build())
+            .build();
+    }
+
+    public static Tool createGrepTool() {
+        return Tool.builder()
+            .name("grep")
+            .description("Search for text patterns in files")
+            .inputSchema(Tool.InputSchema.builder()
+                .type(JsonValue.Type.OBJECT)
+                .putAdditionalProperty("type", JsonValue.from("object"))
+                .putAdditionalProperty("properties", JsonValue.from(Map.of(
+                    "pattern", Map.of(
+                        "type", "string",
+                        "description", "The regex pattern to search for"
+                    ),
+                    "path", Map.of(
+                        "type", "string",
+                        "description", "The directory or file to search in"
+                    )
+                )))
+                .putAdditionalProperty("required", JsonValue.from(List.of("pattern")))
+                .build())
+            .build();
     }
 }
 ```
 
 ---
 
-## 3. Git Notes Deep Dive
+## 6. Git Notes Deep Dive
 
-### 3.1 Git Notes Fundamentals
+### 6.1 Git Notes Fundamentals
 
 Git Notes attach metadata to commits without modifying them:
 
@@ -238,7 +509,7 @@ Git Notes attach metadata to commits without modifying them:
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 3.2 Core Git Notes Commands
+### 6.2 Core Git Notes Commands
 
 | Command | Purpose |
 |---------|---------|
@@ -250,9 +521,16 @@ Git Notes attach metadata to commits without modifying them:
 | `git notes --ref=<namespace>` | Use custom namespace |
 | `git log --show-notes` | Show notes in log output |
 
-### 3.3 Namespaces for TDD Workflow
+### 6.3 Namespaces for TDD Workflow
 
-Using namespaces to organize different handoff types:
+**Recommended Namespaces:**
+
+| Namespace | Purpose |
+|-----------|---------|
+| `refs/notes/tdd-handoffs` | Primary handoff state between agents |
+| `refs/notes/tdd-test-list` | Test list state and progress |
+| `refs/notes/tdd-errors` | Error tracking and recovery info |
+| `refs/notes/tdd-metrics` | Timing and performance data |
 
 ```bash
 # Create handoff note in TDD namespace
@@ -265,16 +543,7 @@ git notes --ref=tdd-handoffs show HEAD
 git notes --ref=tdd-handoffs list
 ```
 
-**Recommended Namespaces:**
-
-| Namespace | Purpose |
-|-----------|---------|
-| `refs/notes/tdd-handoffs` | Primary handoff state between agents |
-| `refs/notes/tdd-test-list` | Test list state and progress |
-| `refs/notes/tdd-errors` | Error tracking and recovery info |
-| `refs/notes/tdd-metrics` | Timing and performance data |
-
-### 3.4 Sharing Notes Between Repositories
+### 6.4 Sharing Notes Between Repositories
 
 Notes require explicit push/pull:
 
@@ -296,19 +565,9 @@ git fetch origin refs/notes/tdd-handoffs:refs/notes/tdd-handoffs
 
 ---
 
-## 4. JGit Integration for Git Notes
+## 7. JGit Integration for Git Notes
 
-### 4.1 JGit Dependency
-
-```xml
-<dependency>
-    <groupId>org.eclipse.jgit</groupId>
-    <artifactId>org.eclipse.jgit</artifactId>
-    <version>6.10.0.202406032230-r</version>
-</dependency>
-```
-
-### 4.2 Git Notes Operations in Java
+### 7.1 Git Notes Operations in Java
 
 ```java
 import org.eclipse.jgit.api.Git;
@@ -387,7 +646,7 @@ public class GitNotesManager {
 }
 ```
 
-### 4.3 Handoff State Data Model
+### 7.2 Handoff State Data Model
 
 ```java
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -440,9 +699,9 @@ public class TestCase {
 
 ---
 
-## 5. Complete Hybrid Orchestrator Implementation
+## 8. Complete Orchestrator Implementation
 
-### 5.1 Architecture Overview
+### 8.1 Architecture Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -472,7 +731,7 @@ public class TestCase {
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 5.2 Main Orchestrator Class
+### 8.2 Main Orchestrator Class
 
 ```java
 package com.redgreenrefactor.orchestrator;
@@ -495,7 +754,6 @@ public class TddOrchestrator {
             "Test List Agent",
             """
             You are the Test List Agent in a TDD workflow.
-
             Your responsibilities:
             1. Analyze feature requirements
             2. Create/update the test list file (test-list.md)
@@ -515,7 +773,6 @@ public class TddOrchestrator {
             "Test Agent",
             """
             You are the Test Agent (Red Phase) in a TDD workflow.
-
             Your responsibilities:
             1. Receive ONE test case description
             2. Write a failing test for that case
@@ -529,7 +786,6 @@ public class TddOrchestrator {
             "Implementing Agent",
             """
             You are the Implementing Agent (Green Phase) in a TDD workflow.
-
             Your responsibilities:
             1. Read the failing test
             2. Write MINIMUM code to make it pass
@@ -544,7 +800,6 @@ public class TddOrchestrator {
             "Refactor Agent",
             """
             You are the Refactor Agent in a TDD workflow.
-
             Your responsibilities:
             1. Review implementation AND test code
             2. Refactor for clarity, maintainability
@@ -571,7 +826,6 @@ public class TddOrchestrator {
         List<CycleResult> cycles = new ArrayList<>();
 
         try {
-            // Initial planning phase
             HandoffState state = runPlanningPhase(featureRequest);
 
             while (state.getCurrentPhase() != HandoffState.Phase.COMPLETE) {
@@ -599,16 +853,9 @@ public class TddOrchestrator {
         HandoffState state = initialState;
 
         try {
-            // Red Phase
             state = runPhase(HandoffState.Phase.RED, state);
-
-            // Green Phase
             state = runPhase(HandoffState.Phase.GREEN, state);
-
-            // Refactor Phase
             state = runPhase(HandoffState.Phase.REFACTOR, state);
-
-            // Back to Planning
             state = runPhase(HandoffState.Phase.PLAN, state);
 
             return new CycleResult(true, state, null);
@@ -622,19 +869,12 @@ public class TddOrchestrator {
             throws Exception {
         AgentConfig config = AGENT_CONFIGS.get(phase);
 
-        // Build prompt with current state context
         String prompt = buildPromptWithContext(config, currentState);
-
-        // Invoke Claude
         Message response = invokeAgent(config, prompt);
-
-        // Process response (parse output, run commands, etc.)
         PhaseResult result = processAgentResponse(phase, response);
 
-        // Commit changes
         ObjectId commitId = gitOps.commitChanges(result.getCommitMessage());
 
-        // Write handoff note to commit
         HandoffState nextState = currentState.toBuilder()
             .currentPhase(phase)
             .nextPhase(getNextPhase(phase, result))
@@ -657,74 +897,100 @@ public class TddOrchestrator {
         return anthropicClient.messages().create(params);
     }
 
-    private String buildPromptWithContext(AgentConfig config, HandoffState state) {
-        StringBuilder prompt = new StringBuilder();
-        prompt.append("## Current State\n");
-        prompt.append("Phase: ").append(state.getCurrentPhase()).append("\n");
-        prompt.append("Cycle: ").append(state.getCycleNumber()).append("\n");
+    /**
+     * Resume workflow from the last known state
+     */
+    public HandoffState resumeFromLastHandoff() throws Exception {
+        ObjectId lastCommit = gitNotesManager.findLatestHandoff();
 
-        if (state.getCurrentTest() != null) {
-            prompt.append("\n## Current Test\n");
-            prompt.append(state.getCurrentTest().getDescription()).append("\n");
+        if (lastCommit == null) {
+            return HandoffState.builder()
+                .currentPhase(HandoffState.Phase.PLAN)
+                .cycleNumber(1)
+                .pendingTests(new ArrayList<>())
+                .completedTests(new ArrayList<>())
+                .build();
         }
 
-        prompt.append("\n## Pending Tests\n");
-        for (String test : state.getPendingTests()) {
-            prompt.append("- [ ] ").append(test).append("\n");
-        }
-
-        prompt.append("\n## Completed Tests\n");
-        for (String test : state.getCompletedTests()) {
-            prompt.append("- [x] ").append(test).append("\n");
-        }
-
-        return prompt.toString();
-    }
-
-    private HandoffState.Phase getNextPhase(HandoffState.Phase current, PhaseResult result) {
-        if (result.isFeatureComplete()) {
-            return HandoffState.Phase.COMPLETE;
-        }
-
-        return switch (current) {
-            case PLAN -> HandoffState.Phase.RED;
-            case RED -> HandoffState.Phase.GREEN;
-            case GREEN -> HandoffState.Phase.REFACTOR;
-            case REFACTOR -> HandoffState.Phase.PLAN;
-            case COMPLETE -> HandoffState.Phase.COMPLETE;
-        };
+        return gitNotesManager.readHandoff(lastCommit);
     }
 }
 ```
 
-### 5.3 Reading Handoff State on Startup
+### 8.3 Streaming for Real-Time Feedback
 
 ```java
-/**
- * Resume workflow from the last known state
- */
-public HandoffState resumeFromLastHandoff() throws Exception {
-    ObjectId lastCommit = gitNotesManager.findLatestHandoff();
+import com.anthropic.core.http.StreamResponse;
+import com.anthropic.models.messages.RawMessageStreamEvent;
+import com.anthropic.helpers.MessageAccumulator;
 
-    if (lastCommit == null) {
-        // No previous handoff found - start fresh
-        return HandoffState.builder()
-            .currentPhase(HandoffState.Phase.PLAN)
-            .cycleNumber(1)
-            .pendingTests(new ArrayList<>())
-            .completedTests(new ArrayList<>())
-            .build();
+public Message invokeWithStreaming(String taskPrompt, Consumer<String> onToken) {
+    MessageCreateParams params = MessageCreateParams.builder()
+        .model(Model.CLAUDE_SONNET_4_20250514)
+        .maxTokens(4096L)
+        .system(systemPrompt)
+        .addUserMessage(taskPrompt)
+        .build();
+
+    MessageAccumulator accumulator = MessageAccumulator.create();
+
+    try (StreamResponse<RawMessageStreamEvent> stream =
+            client.messages().createStreaming(params)) {
+
+        stream.stream()
+            .peek(accumulator::accumulate)
+            .flatMap(event -> event.contentBlockDelta().stream())
+            .flatMap(delta -> delta.delta().text().stream())
+            .forEach(textDelta -> onToken.accept(textDelta.text()));
     }
 
-    return gitNotesManager.readHandoff(lastCommit);
+    return accumulator.message();
+}
+```
+
+### 8.4 Async Agent Orchestration
+
+```java
+import com.anthropic.client.AnthropicClientAsync;
+import com.anthropic.client.okhttp.AnthropicOkHttpClientAsync;
+import java.util.concurrent.CompletableFuture;
+
+public class AsyncTddOrchestrator {
+    private final AnthropicClientAsync client;
+
+    public AsyncTddOrchestrator() {
+        this.client = AnthropicOkHttpClientAsync.fromEnv();
+    }
+
+    public CompletableFuture<Message> invokeAgentAsync(String systemPrompt, String task) {
+        MessageCreateParams params = MessageCreateParams.builder()
+            .model(Model.CLAUDE_SONNET_4_20250514)
+            .maxTokens(4096L)
+            .system(systemPrompt)
+            .addUserMessage(task)
+            .build();
+
+        return client.messages().create(params);
+    }
+
+    /**
+     * Run TDD cycle with async/await pattern
+     */
+    public CompletableFuture<Void> runCycleAsync(String featureRequest) {
+        return runTestListAgentAsync(featureRequest)
+            .thenCompose(v -> runTestAgentAsync())
+            .thenCompose(v -> runImplementingAgentAsync())
+            .thenCompose(v -> runRefactorAgentAsync())
+            .thenRun(() -> System.out.println("Cycle complete!"));
+    }
 }
 ```
 
 ---
 
-## 6. Handoff Flow with Git Notes
+## 9. Handoff Flow with Git Notes
 
-### 6.1 Complete Handoff Sequence
+### 9.1 Complete Handoff Sequence
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -755,10 +1021,6 @@ public HandoffState resumeFromLastHandoff() throws Exception {
 │        "phase": "RED",                                                       │
 │        "next_phase": "GREEN",                                                │
 │        "cycle": 1,                                                           │
-│        "current_test": {                                                     │
-│          "description": "User can log in with valid credentials",           │
-│          "test_file": "tests/test_user_login.py"                            │
-│        },                                                                    │
 │        "test_result": "FAIL"                                                 │
 │      }                                                                       │
 │                           │                                                  │
@@ -771,8 +1033,6 @@ public HandoffState resumeFromLastHandoff() throws Exception {
 │        "phase": "GREEN",                                                     │
 │        "next_phase": "REFACTOR",                                             │
 │        "cycle": 1,                                                           │
-│        "current_test": {...},                                                │
-│        "impl_file": "src/auth/login.py",                                    │
 │        "test_result": "PASS"                                                 │
 │      }                                                                       │
 │                           │                                                  │
@@ -796,48 +1056,122 @@ public HandoffState resumeFromLastHandoff() throws Exception {
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 6.2 Querying Handoff History
+### 9.2 Data Sources for Next Agent
 
-```java
-/**
- * Get complete handoff history for debugging/analysis
- */
-public List<HandoffRecord> getHandoffHistory() throws Exception {
-    List<HandoffRecord> history = new ArrayList<>();
-
-    try (Git git = new Git(repository)) {
-        Iterable<RevCommit> commits = git.log().call();
-
-        NoteMap noteMap = NoteMap.read(
-            repository.newObjectReader(),
-            repository.resolve(TDD_HANDOFFS_REF)
-        );
-
-        for (RevCommit commit : commits) {
-            Note note = noteMap.getNote(commit.getId());
-            if (note != null) {
-                HandoffState state = readNote(note);
-                history.add(new HandoffRecord(
-                    commit.getId(),
-                    commit.getShortMessage(),
-                    commit.getAuthorIdent().getWhen().toInstant(),
-                    state
-                ));
-            }
-        }
-    }
-
-    return history;
-}
 ```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    DATA SOURCES FOR NEXT AGENT                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   DATA SOURCE 1: GIT COMMITS                                                │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  • Commit SHA and message                                            │   │
+│   │  • File changes (diffs)                                              │   │
+│   │  • Author and timestamp                                              │   │
+│   │  • Provides: Code context, change history, implementation details    │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│   DATA SOURCE 2: GIT NOTES                                                  │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  • Phase state (PLAN, RED, GREEN, REFACTOR)                         │   │
+│   │  • Next phase indicator                                              │   │
+│   │  • Current and completed tests                                       │   │
+│   │  • Error states and recovery context                                 │   │
+│   │  • Provides: Workflow state, handoff context, orchestration data     │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│                              │                                               │
+│                              ▼                                               │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │                      NEXT AGENT                                      │   │
+│   │  Receives combined context:                                          │   │
+│   │  • What code was changed (from commits)                              │   │
+│   │  • What phase to execute (from notes)                                │   │
+│   │  • What tests are pending/completed (from notes)                     │   │
+│   │  • Full audit trail for decision-making                              │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+| Aspect | Git Commits Provide | Git Notes Provide |
+|--------|---------------------|-------------------|
+| **Code Changes** | Actual diffs and file modifications | — |
+| **Phase State** | — | Current TDD phase and next action |
+| **Test Progress** | Test file changes | Test list status (pending/complete) |
+| **Context** | Implementation history | Orchestration metadata |
+| **Recovery** | Rollback targets | Error details and retry context |
 
 ---
 
-## 7. Error Handling and Recovery
+## 10. Error Handling and Recovery
 
-### 7.1 Error State in Notes
+### 10.1 Detecting Failures
 
-When an error occurs, store recovery information in the note:
+```java
+public class TDDErrorHandler {
+
+    public boolean isTestFailure(String bashOutput) {
+        return bashOutput.contains("FAILED") ||
+               bashOutput.contains("FAIL:") ||
+               bashOutput.contains("Error") ||
+               bashOutput.matches(".*Exit code: [^0].*");
+    }
+
+    public boolean isUnexpectedPass(String bashOutput, String phase) {
+        if ("red".equals(phase)) {
+            return bashOutput.contains("OK") ||
+                   bashOutput.contains("passed") ||
+                   bashOutput.matches(".*Exit code: 0.*");
+        }
+        return false;
+    }
+}
+```
+
+### 10.2 Retry with Exponential Backoff
+
+```java
+public class RetryHandler {
+
+    private static final int MAX_RETRIES = 3;
+    private static final long INITIAL_DELAY_MS = 1000;
+
+    public <T> T executeWithRetry(Supplier<T> operation) throws Exception {
+        Exception lastException = null;
+
+        for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
+            try {
+                return operation.get();
+            } catch (Exception e) {
+                lastException = e;
+
+                if (attempt < MAX_RETRIES - 1) {
+                    long delay = INITIAL_DELAY_MS * (long) Math.pow(2, attempt);
+                    System.err.printf("Attempt %d failed, retrying in %dms: %s%n",
+                        attempt + 1, delay, e.getMessage());
+                    Thread.sleep(delay);
+                }
+            }
+        }
+
+        throw lastException;
+    }
+}
+```
+
+### 10.3 Recovery Strategies
+
+| Failure Type | Recovery Approach |
+|--------------|-------------------|
+| Test doesn't compile | Re-run test-agent with error context in prompt |
+| Test passes immediately | Re-run test-agent with instruction to check assertions |
+| Implementation breaks other tests | Rollback via git, try alternative approach |
+| Refactoring breaks tests | Rollback via git, re-run refactor-agent |
+| API rate limit | Exponential backoff with retry |
+| Network timeout | Retry with increased timeout |
+
+### 10.4 Error State in Notes
 
 ```java
 public void recordError(ObjectId commitId, Exception error, HandoffState state)
@@ -855,57 +1189,27 @@ public void recordError(ObjectId commitId, Exception error, HandoffState state)
 }
 ```
 
-### 7.2 Recovery Strategies
+---
 
-```java
-public HandoffState recoverFromError() throws Exception {
-    HandoffState lastState = resumeFromLastHandoff();
+## 11. Comparison: Java SDK vs Python SDK
 
-    if (lastState.getError() != null) {
-        System.out.println("Recovering from error: " + lastState.getError());
-
-        // Rollback to last successful phase
-        HandoffState.Phase failedPhase = lastState.getCurrentPhase();
-
-        return switch (failedPhase) {
-            case RED -> {
-                // Test didn't compile or passed when it should fail
-                // Retry with more context
-                yield lastState.toBuilder()
-                    .error(null)
-                    .retryContext("Previous test failed to compile or unexpectedly passed")
-                    .build();
-            }
-            case GREEN -> {
-                // Implementation couldn't make test pass
-                // Could try different approach or flag for human review
-                yield lastState.toBuilder()
-                    .error(null)
-                    .retryContext("Previous implementation attempt failed")
-                    .build();
-            }
-            case REFACTOR -> {
-                // Refactoring broke tests - rollback and skip refactoring
-                gitOps.resetToCommit(findLastGreenCommit());
-                yield lastState.toBuilder()
-                    .currentPhase(HandoffState.Phase.REFACTOR)
-                    .nextPhase(HandoffState.Phase.PLAN)
-                    .error(null)
-                    .build();
-            }
-            default -> lastState;
-        };
-    }
-
-    return lastState;
-}
-```
+| Feature | Java SDK (anthropic-java) | Python SDK (claude_agent_sdk) |
+|---------|---------------------------|-------------------------------|
+| **Agent Definitions** | Manual (builder pattern) | Built-in AgentDefinition class |
+| **Tool Definitions** | JSON Schema via builders | Decorator-based |
+| **Session Management** | Manual | Built-in session_id tracking |
+| **Subagent Invocation** | Manual orchestration | Built-in Task tool |
+| **Streaming** | StreamResponse + accumulator | async for pattern |
+| **Async Support** | CompletableFuture | Native async/await |
+| **Error Handling** | Try-catch | Exception + async error handling |
+| **Type Safety** | Strong (records, generics) | Dynamic (type hints) |
+| **Ecosystem** | Spring AI integration | Native Python tools |
 
 ---
 
-## 8. Advantages of This Hybrid Approach
+## 12. Advantages of This Hybrid Approach
 
-### 8.1 Comparison Matrix
+### 12.1 Comparison Matrix
 
 | Criterion | File-Only | SDK-Only | **Java + Git Notes** |
 |-----------|-----------|----------|----------------------|
@@ -918,7 +1222,7 @@ public HandoffState recoverFromError() throws Exception {
 | **Portability** | High | SDK-specific | JVM + Git |
 | **CI/CD Integration** | Good | Complex | Native |
 
-### 8.2 Unique Benefits
+### 12.2 Unique Benefits
 
 1. **Immutable Handoff Records**: Notes are version-controlled; handoff history is never lost
 2. **Atomic Phase Completion**: Each commit + note = one atomic handoff
@@ -927,7 +1231,7 @@ public HandoffState recoverFromError() throws Exception {
 5. **Offline Capable**: All state is local; no network dependency between phases
 6. **Debuggable**: `git log --show-notes=tdd-handoffs` shows complete history
 
-### 8.3 Potential Challenges
+### 12.3 Potential Challenges
 
 | Challenge | Mitigation |
 |-----------|------------|
@@ -938,7 +1242,7 @@ public HandoffState recoverFromError() throws Exception {
 
 ---
 
-## 9. Implementation Roadmap
+## 13. Implementation Roadmap
 
 ### Phase 1: Foundation
 - Set up Java project with Maven/Gradle
@@ -963,70 +1267,18 @@ public HandoffState recoverFromError() throws Exception {
 
 ---
 
-## 10. Data Sources for Agent Context
+## 14. Open Questions for Implementation
 
-### 10.1 Primary Data Sources
-
-The next agent in the TDD workflow will consume two primary data sources:
-
-1. **Git Notes** - Structured handoff metadata attached to commits
-2. **Git Commits** - The commit history and associated changes
-
-### 10.2 Data Flow Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    DATA SOURCES FOR NEXT AGENT                               │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│   DATA SOURCE 1: GIT COMMITS                                                │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │  • Commit SHA and message                                            │   │
-│   │  • File changes (diffs)                                              │   │
-│   │  • Author and timestamp                                              │   │
-│   │  • Parent commit relationships                                       │   │
-│   │  • Provides: Code context, change history, implementation details    │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-│   DATA SOURCE 2: GIT NOTES                                                  │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │  • Phase state (PLAN, RED, GREEN, REFACTOR)                         │   │
-│   │  • Next phase indicator                                              │   │
-│   │  • Current and completed tests                                       │   │
-│   │  • Error states and recovery context                                 │   │
-│   │  • Provides: Workflow state, handoff context, orchestration data     │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-│                              │                                               │
-│                              ▼                                               │
-│   ┌─────────────────────────────────────────────────────────────────────┐   │
-│   │                      NEXT AGENT                                      │   │
-│   │                                                                      │   │
-│   │  Receives combined context:                                          │   │
-│   │  • What code was changed (from commits)                              │   │
-│   │  • What phase to execute (from notes)                                │   │
-│   │  • What tests are pending/completed (from notes)                     │   │
-│   │  • Full audit trail for decision-making                              │   │
-│   └─────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
-
-### 10.3 Why Both Data Sources Are Required
-
-| Aspect | Git Commits Provide | Git Notes Provide |
-|--------|---------------------|-------------------|
-| **Code Changes** | Actual diffs and file modifications | — |
-| **Phase State** | — | Current TDD phase and next action |
-| **Test Progress** | Test file changes | Test list status (pending/complete) |
-| **Context** | Implementation history | Orchestration metadata |
-| **Recovery** | Rollback targets | Error details and retry context |
-
-The combination ensures the next agent has both the **code context** (what changed) and the **workflow context** (what to do next).
+1. **Spring AI Integration**: Should we use Spring AI's AnthropicChatModel for better DI support?
+2. **Parallel cycles**: Can multiple TDD cycles run in parallel using CompletableFuture?
+3. **Human approval gates**: Should there be optional pause points for human review?
+4. **Rollback granularity**: Should rollback be to last commit or last known-good state?
+5. **Test framework detection**: Should orchestrator auto-detect JUnit/TestNG/etc.?
+6. **Tool execution sandboxing**: How to safely execute bash commands?
 
 ---
 
-## 11. References
+## 15. References
 
 - [Anthropic Java SDK - GitHub](https://github.com/anthropics/anthropic-sdk-java)
 - [Anthropic Java SDK - Maven Central](https://central.sonatype.com/artifact/com.anthropic/anthropic-java)
@@ -1036,60 +1288,7 @@ The combination ensures the next agent has both the **code context** (what chang
 
 ---
 
-## Appendix A: Complete Maven POM
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-
-    <groupId>com.redgreenrefactor</groupId>
-    <artifactId>tdd-orchestrator</artifactId>
-    <version>1.0-SNAPSHOT</version>
-    <packaging>jar</packaging>
-
-    <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
-
-    <dependencies>
-        <!-- Anthropic Java SDK -->
-        <dependency>
-            <groupId>com.anthropic</groupId>
-            <artifactId>anthropic-java</artifactId>
-            <version>2.11.1</version>
-        </dependency>
-
-        <!-- JGit for Git Notes -->
-        <dependency>
-            <groupId>org.eclipse.jgit</groupId>
-            <artifactId>org.eclipse.jgit</artifactId>
-            <version>6.10.0.202406032230-r</version>
-        </dependency>
-
-        <!-- Jackson for JSON -->
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>2.18.2</version>
-        </dependency>
-
-        <!-- SLF4J for logging -->
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
-            <version>2.0.9</version>
-        </dependency>
-    </dependencies>
-</project>
-```
-
-## Appendix B: Git Notes Quick Reference
+## Appendix A: Git Notes Quick Reference
 
 ```bash
 # === SETUP ===
@@ -1126,4 +1325,39 @@ git push origin refs/notes/tdd-handoffs
 
 # Fetch notes from remote
 git fetch origin refs/notes/tdd-handoffs:refs/notes/tdd-handoffs
+```
+
+## Appendix B: Required Imports
+
+```java
+// Anthropic SDK
+import com.anthropic.client.AnthropicClient;
+import com.anthropic.client.AnthropicClientAsync;
+import com.anthropic.client.okhttp.AnthropicOkHttpClient;
+import com.anthropic.client.okhttp.AnthropicOkHttpClientAsync;
+import com.anthropic.core.JsonValue;
+import com.anthropic.core.http.StreamResponse;
+import com.anthropic.helpers.MessageAccumulator;
+import com.anthropic.models.messages.*;
+
+// JGit
+import org.eclipse.jgit.api.Git;
+import org.eclipse.jgit.lib.*;
+import org.eclipse.jgit.notes.*;
+
+// Java standard library
+import java.nio.file.Path;
+import java.nio.file.Files;
+import java.util.List;
+import java.util.Map;
+import java.util.ArrayList;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
+
+// JSON processing
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.annotation.JsonProperty;
 ```
