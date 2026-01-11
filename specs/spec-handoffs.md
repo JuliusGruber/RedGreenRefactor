@@ -1,8 +1,8 @@
 # Handoffs Specification
 
-> **Status: Needs Design**
+> **Status: Designed**
 >
-> The handoff mechanism is a critical component that coordinates transitions between independent Claude Code sessions. This specification needs to be fully designed.
+> The handoff mechanism coordinates transitions between independent Claude Code sessions using Anthropic SDK + Git Commits + Git Notes.
 
 ## Design Decisions
 
@@ -17,36 +17,38 @@ Since each agent runs as an independent Claude Code session (no shared memory), 
 - Coordinating session transitions
 - Maintaining workflow state
 
-## Open Questions
+## Open Questions (Resolved)
 
-### Handoff Mechanism
+> The following questions have been resolved by the chosen approach documented below.
 
-- How is a session notified that it's their turn?
-- What triggers the transition from one session to the next?
-- Is there an orchestrator, or do sessions self-coordinate?
-- How are prompts/instructions delivered to each session?
+### Handoff Mechanism *(Resolved: See "Chosen Approach" section)*
 
-### Agent Context and Information Access
+- ~~How is a session notified that it's their turn?~~ → Orchestrator invokes each agent in sequence
+- ~~What triggers the transition from one session to the next?~~ → Orchestrator reads Git Notes and triggers next phase
+- ~~Is there an orchestrator, or do sessions self-coordinate?~~ → **Orchestrator** coordinates all sessions
+- ~~How are prompts/instructions delivered to each session?~~ → Orchestrator builds prompts with context from Git Notes
 
-- Does each session see the full codebase, or only specific files?
-- Does each session know about previous cycles, or is it stateless?
-- Does the Test Agent only receive the test description, or also the current implementation state?
-- How does a session know which role it should assume?
+### Agent Context and Information Access *(Resolved: See "Data Sources for Agent Context")*
 
-### Handoff Data Structure
+- ~~Does each session see the full codebase, or only specific files?~~ → Full codebase access via Git repository
+- ~~Does each session know about previous cycles, or is it stateless?~~ → Context passed via Git Notes attached to commits
+- ~~Does the Test Agent only receive the test description, or also the current implementation state?~~ → Receives test description + full repo access
+- ~~How does a session know which role it should assume?~~ → Orchestrator provides role-specific system prompt
 
-- What exact information is passed from Test List Agent to Test Agent?
-- What exact information is passed from Test Agent to Implementing Agent?
-- What exact information is passed from Implementing Agent to Refactor Agent?
-- What exact information is passed from Refactor Agent back to Test List Agent?
+### Handoff Data Structure *(Resolved: See "Handoff State Structure")*
 
-### Git as Shared State
+- ~~What exact information is passed from Test List Agent to Test Agent?~~ → `current_test` in Git Notes
+- ~~What exact information is passed from Test Agent to Implementing Agent?~~ → `current_test.test_file` + `test_result`
+- ~~What exact information is passed from Implementing Agent to Refactor Agent?~~ → `current_test.impl_file` + `test_result`
+- ~~What exact information is passed from Refactor Agent back to Test List Agent?~~ → `completed_tests` updated, `next_phase: PLAN`
 
-- Is git the only shared state mechanism?
-- Should there be a handoff file (e.g., `.handoff.json`) in the repository?
-- How does a session know what the previous session accomplished?
+### Git as Shared State *(Resolved: See "Chosen Approach")*
 
-### Pre-existing Codebase
+- ~~Is git the only shared state mechanism?~~ → Yes: Git commits + Git Notes
+- ~~Should there be a handoff file (e.g., `.handoff.json`) in the repository?~~ → No, use Git Notes instead (non-intrusive)
+- ~~How does a session know what the previous session accomplished?~~ → Read Git Notes from latest commit
+
+### Pre-existing Codebase *(Open for future specification)*
 
 - How does the workflow handle existing codebases with existing tests?
 - Should the Test List Agent account for existing tests when planning?
@@ -102,9 +104,9 @@ After evaluating multiple approaches, the chosen handoff mechanism combines:
 │   │   ┌─────────────────┐     ┌─────────────────────────────────────┐  │    │
 │   │   │ Commit History  │     │ refs/notes/tdd-handoffs             │  │    │
 │   │   │                 │     │                                     │  │    │
-│   │   │ abc123 ─────────│────►│ {"phase": "red", "test": "..."}    │  │    │
-│   │   │ def456 ─────────│────►│ {"phase": "green", "impl": "..."}  │  │    │
-│   │   │ ghi789 ─────────│────►│ {"phase": "refactor", ...}         │  │    │
+│   │   │ abc123 ─────────│────►│ {"phase": "RED", "test": "..."}    │  │    │
+│   │   │ def456 ─────────│────►│ {"phase": "GREEN", "impl": "..."}  │  │    │
+│   │   │ ghi789 ─────────│────►│ {"phase": "REFACTOR", ...}         │  │    │
 │   │   │                 │     │                                     │  │    │
 │   │   └─────────────────┘     └─────────────────────────────────────┘  │    │
 │   │                                                                     │    │
@@ -143,6 +145,7 @@ The next agent in the TDD workflow consumes two primary data sources:
   "completed_tests": ["User model exists with email"],
   "pending_tests": ["User can log out", "Invalid creds return error"],
   "test_result": "PASS",
+  "error": null,
   "timestamp": "2025-01-11T10:30:00Z"
 }
 ```

@@ -39,8 +39,8 @@ The Claude Agent SDK provides native multi-agent orchestration through **subagen
 │    Session 1          Session 2          Session 3          Session 4
 │    ┌─────────┐        ┌─────────┐        ┌─────────┐        ┌─────────┐
 │    │ Test    │   →    │ Test    │   →    │ Impl    │   →    │ Refactor│
-│    │ List    │ files  │ Agent   │ files  │ Agent   │ files  │ Agent   │
-│    │ Agent   │        │         │        │         │        │         │
+│    │ List    │  Git   │ Agent   │  Git   │ Agent   │  Git   │ Agent   │
+│    │ Agent   │ Notes  │         │ Notes  │         │ Notes  │         │
 │    └─────────┘        └─────────┘        └─────────┘        └─────────┘
 │         ↓                  ↓                  ↓                  ↓
 │    Fresh context      Fresh context      Fresh context      Fresh context
