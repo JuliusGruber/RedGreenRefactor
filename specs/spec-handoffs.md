@@ -180,7 +180,7 @@ The next agent in the TDD workflow consumes two primary data sources:
 
 1. **Agent Definitions** - Custom record class with name, prompt, tools, model
 2. **Orchestration Loop** - Message creation → tool use detection → tool execution → continue
-3. **State Management** - `.tdd-state.json` or Git Notes for inter-agent coordination
+3. **State Management** - Git Notes for inter-agent coordination
 4. **Tool Execution** - Implement handlers for each tool (read, write, bash, etc.)
 
 ### Bottom Line

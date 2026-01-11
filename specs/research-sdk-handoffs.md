@@ -158,221 +158,18 @@ Each agent receives only the tools needed for its phase:
 
 ---
 
-## 3. Handoff Implementation Strategies
+## 3. Chosen Handoff Approach
 
-### 3.1 Strategy A: Filesystem + State File (Recommended)
-
-Use a `.tdd-state.json` file as the coordination mechanism:
-
-```json
-{
-  "feature": "user-authentication",
-  "current_cycle": 3,
-  "current_phase": "green",
-  "test_list_file": "tests/test-list-user-auth.md",
-  "current_test": {
-    "description": "User can log in with valid credentials",
-    "test_file": "tests/test_user_login.py",
-    "impl_file": "src/auth/login.py"
-  },
-  "completed_tests": [
-    "User model exists with email and password_hash",
-    "Password can be hashed and verified"
-  ],
-  "pending_tests": [
-    "User can log out",
-    "Invalid credentials return error"
-  ],
-  "last_phase_result": {
-    "phase": "red",
-    "success": true,
-    "commit": "abc123",
-    "errors": []
-  }
-}
-```
-
-**How it works:**
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    FILESYSTEM HANDOFF FLOW                           │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  1. Test List Agent                                                  │
-│     ├─ Reads: feature request                                        │
-│     ├─ Writes: test-list.md, .tdd-state.json                        │
-│     └─ Commits: "plan: add test list for user-auth"                 │
-│                           │                                          │
-│                           ▼                                          │
-│  2. Test Agent                                                       │
-│     ├─ Reads: .tdd-state.json (gets current_test)                   │
-│     ├─ Writes: test file                                            │
-│     ├─ Runs: tests (verifies failure)                               │
-│     ├─ Updates: .tdd-state.json (phase: "red" → complete)           │
-│     └─ Commits: "test: add failing test for login"                  │
-│                           │                                          │
-│                           ▼                                          │
-│  3. Implementing Agent                                               │
-│     ├─ Reads: .tdd-state.json, test file                            │
-│     ├─ Writes: implementation                                        │
-│     ├─ Runs: tests (verifies passing)                               │
-│     ├─ Updates: .tdd-state.json (phase: "green" → complete)         │
-│     └─ Commits: "feat: implement login"                             │
-│                           │                                          │
-│                           ▼                                          │
-│  4. Refactor Agent                                                   │
-│     ├─ Reads: .tdd-state.json, test file, impl file                 │
-│     ├─ Edits: code as needed                                        │
-│     ├─ Runs: tests (verifies still passing)                         │
-│     ├─ Updates: .tdd-state.json (cycle complete)                    │
-│     └─ Commits: "refactor: clean up login implementation"           │
-│                           │                                          │
-│                           ▼                                          │
-│  5. Back to Test List Agent (next cycle)                            │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### 3.2 Strategy B: Session Resumption
-
-Pass the session ID between agents to maintain conversation context:
-
-```python
-async def run_tdd_cycle(feature_request: str) -> str:
-    session_id = None
-
-    # Phase 1: Test List Agent
-    async for msg in query(
-        prompt=f"[TEST LIST AGENT] Create test list for: {feature_request}",
-        options=ClaudeAgentOptions(...)
-    ):
-        if msg.type == 'system' and msg.subtype == 'init':
-            session_id = msg.session_id
-
-    # Phase 2: Test Agent (resumes session)
-    async for msg in query(
-        prompt="[TEST AGENT] Write failing test for the first pending test",
-        options=ClaudeAgentOptions(
-            resume=session_id,  # Continues from previous context
-            ...
-        )
-    ):
-        pass
-
-    # Phase 3: Implementing Agent (resumes session)
-    async for msg in query(
-        prompt="[IMPLEMENTING AGENT] Make the failing test pass",
-        options=ClaudeAgentOptions(
-            resume=session_id,
-            ...
-        )
-    ):
-        pass
-
-    # Phase 4: Refactor Agent (resumes session)
-    async for msg in query(
-        prompt="[REFACTOR AGENT] Refactor the implementation",
-        options=ClaudeAgentOptions(
-            resume=session_id,
-            ...
-        )
-    ):
-        pass
-
-    return session_id
-```
-
-**Trade-offs:**
-
-| Aspect | Filesystem (Strategy A) | Session Resumption (Strategy B) |
-|--------|------------------------|--------------------------------|
-| Context isolation | ✓ Full isolation | ✗ Context accumulates |
-| Context size | ✓ Small, focused | ✗ Grows each phase |
-| Debugging | ✓ Inspect .tdd-state.json | ✗ Harder to trace |
-| Parallelization | ✓ Possible for independent cycles | ✗ Sequential only |
-| Failure recovery | ✓ Restart from state file | ✗ Must replay from session |
-| Spec compliance | ✓ Matches "new session each time" | ✗ Same session |
-
-### 3.3 Strategy C: Orchestrator with Subagent Invocation
-
-A main orchestrator agent spawns subagents using the Task tool:
-
-```python
-orchestrator_prompt = """You are the TDD Orchestrator.
-
-Your role is to coordinate the TDD workflow by invoking specialized agents:
-1. test-list-agent: Creates/updates test list
-2. test-agent: Writes failing tests (Red)
-3. implementing-agent: Makes tests pass (Green)
-4. refactor-agent: Improves code quality (Refactor)
-
-For each TDD cycle:
-1. Invoke test-list-agent to get the next test
-2. Invoke test-agent to write the failing test
-3. Invoke implementing-agent to make it pass
-4. Invoke refactor-agent to clean up
-5. Repeat until test-list-agent signals completion
-
-Use the Task tool to invoke each agent with specific context."""
-
-async for msg in query(
-    prompt=f"{orchestrator_prompt}\n\nFeature request: {feature_request}",
-    options=ClaudeAgentOptions(
-        allowed_tools=["Task", "Read"],
-        agents={
-            "test-list-agent": AgentDefinition(...),
-            "test-agent": AgentDefinition(...),
-            "implementing-agent": AgentDefinition(...),
-            "refactor-agent": AgentDefinition(...)
-        }
-    )
-):
-    print(msg)
-```
-
-**How subagent invocation works:**
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                    ORCHESTRATOR PATTERN                              │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │              ORCHESTRATOR AGENT                              │    │
-│  │                                                              │    │
-│  │  "Use the test-list-agent to create a test list for         │    │
-│  │   user authentication"                                       │    │
-│  │                                                              │    │
-│  │        │                                                     │    │
-│  │        ▼                                                     │    │
-│  │  ┌──────────────────────────────────────────────────────┐   │    │
-│  │  │ Task Tool Call                                       │   │    │
-│  │  │ subagent_type: "test-list-agent"                     │   │    │
-│  │  │ prompt: "Create test list for user auth feature"     │   │    │
-│  │  └──────────────────────────────────────────────────────┘   │    │
-│  │        │                                                     │    │
-│  │        ▼                                                     │    │
-│  │  ┌──────────────────────────────────────────────────────┐   │    │
-│  │  │ SUBAGENT EXECUTION (isolated context)                │   │    │
-│  │  │ - Reads feature requirements                         │   │    │
-│  │  │ - Creates test-list.md                               │   │    │
-│  │  │ - Returns: "Created test list with 5 tests"          │   │    │
-│  │  └──────────────────────────────────────────────────────┘   │    │
-│  │        │                                                     │    │
-│  │        ▼                                                     │    │
-│  │  Orchestrator receives result, decides next step            │    │
-│  │                                                              │    │
-│  │  "Now use the test-agent to write the first failing test"   │    │
-│  │                                                              │    │
-│  └──────────────────────────────────────────────────────────────┘   │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
-```
+> **Decision**: The handoff mechanism uses **Anthropic SDK + Git Commits + Git Notes**.
+>
+> See [spec-handoffs.md](spec-handoffs.md) for the full specification of the chosen approach.
+> See [research-java-sdk-git-notes.md](research-java-sdk-git-notes.md) for detailed implementation research.
 
 ---
 
 ## 4. Context Passing Mechanisms
+
+> **Note**: The examples below reference `.tdd-state.json` for illustration. The actual implementation uses **Git Notes** for state management. See [research-java-sdk-git-notes.md](research-java-sdk-git-notes.md) for the Git Notes implementation.
 
 ### 4.1 What Context Each Agent Needs
 
@@ -445,6 +242,8 @@ async def update_tdd_state(args: dict) -> dict:
 ---
 
 ## 5. Implementation Patterns
+
+> **Note**: The orchestrator examples below reference `.tdd-state.json` for illustration. The actual implementation uses **Git Notes** for state management. See [research-java-sdk-git-notes.md](research-java-sdk-git-notes.md) for the authoritative Git Notes implementation.
 
 ### 5.1 Python Orchestrator (Full Example)
 
@@ -730,23 +529,25 @@ async def run_with_retry(agent_func, max_retries=3):
 
 ### 8.1 For This Project (RedGreenRefactor)
 
-**Recommended approach: Hybrid Filesystem + SDK**
+**Chosen approach: Anthropic SDK + Git Commits + Git Notes**
 
-1. **Use Claude Agent SDK** for agent invocation and session management
-2. **Use `.tdd-state.json`** for state persistence and handoff data
+1. **Use Anthropic SDK** (Java or Python) for agent invocation
+2. **Use Git Notes** for state persistence and handoff data
 3. **Use git commits** for atomic phase completion markers
 4. **Use tool restrictions** to enforce agent boundaries
 
+See [spec-handoffs.md](spec-handoffs.md) for the full specification.
+
 ### 8.2 Implementation Priority
 
-1. **Start simple**: Python orchestrator with query() for each agent
-2. **Add state management**: .tdd-state.json for coordination
+1. **Start simple**: Orchestrator with SDK for each agent
+2. **Add state management**: Git Notes for coordination
 3. **Add error handling**: Retry logic with error context
-4. **Optimize later**: Subagent definitions, custom MCP tools
+4. **Optimize later**: Streaming, async execution
 
 ### 8.3 Key Success Factors
 
-- **Clear state file schema**: Define .tdd-state.json structure upfront
+- **Clear handoff state schema**: Define Git Notes structure upfront
 - **Explicit prompts**: Each agent gets full context in its prompt
 - **Tool restrictions**: Prevent agents from exceeding their scope
 - **Commit discipline**: Each phase commits before handoff
