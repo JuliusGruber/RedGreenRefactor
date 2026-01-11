@@ -963,7 +963,70 @@ public HandoffState recoverFromError() throws Exception {
 
 ---
 
-## 10. References
+## 10. Data Sources for Agent Context
+
+### 10.1 Primary Data Sources
+
+The next agent in the TDD workflow will consume two primary data sources:
+
+1. **Git Notes** - Structured handoff metadata attached to commits
+2. **Git Commits** - The commit history and associated changes
+
+### 10.2 Data Flow Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    DATA SOURCES FOR NEXT AGENT                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   DATA SOURCE 1: GIT COMMITS                                                │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  • Commit SHA and message                                            │   │
+│   │  • File changes (diffs)                                              │   │
+│   │  • Author and timestamp                                              │   │
+│   │  • Parent commit relationships                                       │   │
+│   │  • Provides: Code context, change history, implementation details    │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│   DATA SOURCE 2: GIT NOTES                                                  │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │  • Phase state (PLAN, RED, GREEN, REFACTOR)                         │   │
+│   │  • Next phase indicator                                              │   │
+│   │  • Current and completed tests                                       │   │
+│   │  • Error states and recovery context                                 │   │
+│   │  • Provides: Workflow state, handoff context, orchestration data     │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+│                              │                                               │
+│                              ▼                                               │
+│   ┌─────────────────────────────────────────────────────────────────────┐   │
+│   │                      NEXT AGENT                                      │   │
+│   │                                                                      │   │
+│   │  Receives combined context:                                          │   │
+│   │  • What code was changed (from commits)                              │   │
+│   │  • What phase to execute (from notes)                                │   │
+│   │  • What tests are pending/completed (from notes)                     │   │
+│   │  • Full audit trail for decision-making                              │   │
+│   └─────────────────────────────────────────────────────────────────────┘   │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 10.3 Why Both Data Sources Are Required
+
+| Aspect | Git Commits Provide | Git Notes Provide |
+|--------|---------------------|-------------------|
+| **Code Changes** | Actual diffs and file modifications | — |
+| **Phase State** | — | Current TDD phase and next action |
+| **Test Progress** | Test file changes | Test list status (pending/complete) |
+| **Context** | Implementation history | Orchestration metadata |
+| **Recovery** | Rollback targets | Error details and retry context |
+
+The combination ensures the next agent has both the **code context** (what changed) and the **workflow context** (what to do next).
+
+---
+
+## 11. References
 
 - [Anthropic Java SDK - GitHub](https://github.com/anthropics/anthropic-sdk-java)
 - [Anthropic Java SDK - Maven Central](https://central.sonatype.com/artifact/com.anthropic/anthropic-java)
