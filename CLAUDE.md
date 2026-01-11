@@ -14,3 +14,7 @@ This project is configured with GitHub's official MCP server for PR and reposito
 - **Issue tracking**: Create and manage issues
 
 **Setup requirement**: Set `GITHUB_PAT` environment variable with a GitHub Personal Access Token (needs `repo` scope for PR operations).
+
+## Adding MCP Servers
+
+When asked to add a new MCP server, add it to the `.mcp.json` file in the project root. This file contains the consolidated MCP server configuration for the project.
