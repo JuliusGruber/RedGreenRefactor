@@ -70,9 +70,9 @@ This document consolidates research on building a multi-agent TDD orchestrator u
 │   │   ┌─────────────────┐     ┌─────────────────────────────────────┐  │    │
 │   │   │ Commit History  │     │ refs/notes/tdd-handoffs             │  │    │
 │   │   │                 │     │                                     │  │    │
-│   │   │ abc123 ─────────│────►│ {"phase": "red", "test": "..."}    │  │    │
-│   │   │ def456 ─────────│────►│ {"phase": "green", "impl": "..."}  │  │    │
-│   │   │ ghi789 ─────────│────►│ {"phase": "refactor", ...}         │  │    │
+│   │   │ abc123 ─────────│────►│ {"phase": "RED", "test": "..."}    │  │    │
+│   │   │ def456 ─────────│────►│ {"phase": "GREEN", "impl": "..."}  │  │    │
+│   │   │ ghi789 ─────────│────►│ {"phase": "REFACTOR", ...}         │  │    │
 │   │   │                 │     │                                     │  │    │
 │   │   └─────────────────┘     └─────────────────────────────────────┘  │    │
 │   │                                                                     │    │
@@ -219,8 +219,8 @@ public class TddOrchestrator {
 │    Session 1          Session 2          Session 3          Session 4
 │    ┌─────────┐        ┌─────────┐        ┌─────────┐        ┌─────────┐
 │    │ Test    │   →    │ Test    │   →    │ Impl    │   →    │ Refactor│
-│    │ List    │ notes  │ Agent   │ notes  │ Agent   │ notes  │ Agent   │
-│    │ Agent   │        │         │        │         │        │         │
+│    │ List    │  Git   │ Agent   │  Git   │ Agent   │  Git   │ Agent   │
+│    │ Agent   │ Notes  │         │ Notes  │         │ Notes  │         │
 │    └─────────┘        └─────────┘        └─────────┘        └─────────┘
 │         ↓                  ↓                  ↓                  ↓
 │    Fresh context      Fresh context      Fresh context      Fresh context
@@ -534,7 +534,7 @@ Git Notes attach metadata to commits without modifying them:
 
 ```bash
 # Create handoff note in TDD namespace
-git notes --ref=tdd-handoffs add -m '{"phase":"red","test":"user login"}' HEAD
+git notes --ref=tdd-handoffs add -m '{"phase":"RED","test":"user login"}' HEAD
 
 # Read handoff note
 git notes --ref=tdd-handoffs show HEAD
@@ -673,6 +673,9 @@ public class HandoffState {
 
     @JsonProperty("pending_tests")
     private List<String> pendingTests;
+
+    @JsonProperty("test_result")
+    private String testResult;
 
     @JsonProperty("error")
     private String error;
