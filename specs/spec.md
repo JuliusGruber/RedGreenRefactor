@@ -298,7 +298,22 @@ This ensures:
 - **Clean Code**: Dedicated refactoring phase ensures maintainability
 - **Traceability**: Clear handoffs between phases
 
+## Implementation Decision: Java SDK
+
+After evaluating available options for the orchestrator implementation, **we have decided to use the Anthropic Java SDK** with Git Notes for agent handoffs.
+
+**Key reasons for this decision:**
+- Type safety with compile-time checking for agent orchestration
+- Enterprise maturity with proven concurrency and error handling
+- Git Notes provide non-intrusive, version-controlled handoff state
+- No external dependencies beyond Git itself
+
+For full implementation details, see [Java SDK Research](research-java-sdk.md).
+
+**Note:** The Python SDK approach documented in [Python SDK Handoffs Research](research-sdk-handoffs-python.md) is retained for potential future comparison or alternative implementation.
+
 ## Related Specifications
 
 - [Handoffs Specification](spec-handoffs.md) - Agent context, information access, and handoff mechanisms
 - [Error Handling Specification](spec-error-handling.md) - Failure scenarios and recovery strategies
+- [Java SDK Research](research-java-sdk.md) - Chosen implementation approach using Anthropic Java SDK with Git Notes
