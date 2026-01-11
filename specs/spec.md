@@ -117,7 +117,7 @@ Each agent has specific test execution responsibilities to ensure the TDD cycle 
            │
            ▼
 ┌─────────────────────┐
-│   REFACTOR AGENT      │  ← 🔵 REFACTOR
+│  REFACTOR AGENT     │  ← 🔵 REFACTOR
 │ (Improves code)     │
 └──────────┬──────────┘
            │
@@ -204,7 +204,7 @@ The following diagram shows how the Test List Agent writes a test list and passe
          │                     │                         │
          │                     ▼                         │
          │         ┌─────────────────────────┐           │
-         │         │    REFACTOR AGENT         │           │
+         │         │    REFACTOR AGENT       │           │
          │         │   🔵 REFACTOR PHASE     │           │
          │         │   (Improve code)        │           │
          │         └───────────┬─────────────┘           │
@@ -281,7 +281,7 @@ Each TDD cycle produces **four commits**, one from each agent:
 │  1. 📋 PLAN COMMIT     │  Test List Agent commits test list         │
 │  2. 🔴 RED COMMIT      │  Test Agent commits failing tests          │
 │  3. 🟢 GREEN COMMIT    │  Implementing Agent commits passing code   │
-│  4. 🔵 REFACTOR COMMIT │  Refactor Agent commits refactored code      │
+│  4. 🔵 REFACTOR COMMIT │  Refactor Agent commits refactored code    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -310,7 +310,7 @@ After evaluating available options for the orchestrator implementation, **we hav
 
 For full implementation details, see [Java SDK Research](research-java-sdk.md).
 
-**Note:** The Python SDK approach documented in [Python SDK Handoffs Research](research-sdk-handoffs-python.md) is retained for potential future comparison or alternative implementation.
+**Note:** The Python SDK approach documented in [Python SDK Handoffs Research](research-sdk-handoffs-python.md) is retained as a Python implementation reference using the same Git Notes architecture.
 
 ## Related Specifications
 

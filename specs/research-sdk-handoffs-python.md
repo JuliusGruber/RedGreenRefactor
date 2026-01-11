@@ -169,7 +169,7 @@ Each agent receives only the tools needed for its phase:
 
 ## 4. Context Passing Mechanisms
 
-> **Note**: The examples below reference `.tdd-state.json` for illustration. The actual implementation uses **Git Notes** for state management. See [research-java-sdk.md](research-java-sdk.md) for the Git Notes implementation.
+> **Note**: State management uses **Git Notes** for non-intrusive metadata storage. See [research-java-sdk.md](research-java-sdk.md) for detailed Git Notes implementation.
 
 ### 4.1 What Context Each Agent Needs
 
@@ -204,70 +204,112 @@ Write a failing test for the described test case.
 """
 ```
 
-### 4.3 Context Passing via MCP Tools
+### 4.3 Context Passing via Git Notes
 
-Create custom MCP tools for TDD state management:
+Create utilities for reading and writing Git Notes:
 
 ```python
-@tool(
-    "get_tdd_state",
-    "Read the current TDD workflow state",
-    {}
-)
-async def get_tdd_state(args: dict) -> dict:
-    with open(".tdd-state.json") as f:
-        state = json.load(f)
-    return {
-        "content": [{
-            "type": "text",
-            "text": json.dumps(state, indent=2)
-        }]
-    }
+import subprocess
+import json
 
-@tool(
-    "update_tdd_state",
-    "Update the TDD workflow state after completing a phase",
-    {
-        "phase": "str - completed phase name",
-        "success": "bool - whether phase succeeded",
-        "commit": "str - commit hash if committed",
-        "next_phase": "str - next phase to execute"
-    }
-)
-async def update_tdd_state(args: dict) -> dict:
-    # Read, update, write state
-    ...
+TDD_NOTES_REF = "refs/notes/tdd-handoffs"
+
+def read_handoff_state(commit: str = "HEAD") -> dict:
+    """Read handoff state from Git Notes"""
+    try:
+        result = subprocess.run(
+            ["git", "notes", f"--ref={TDD_NOTES_REF}", "show", commit],
+            capture_output=True, text=True, check=True
+        )
+        return json.loads(result.stdout)
+    except subprocess.CalledProcessError:
+        return {"phase": "PLAN", "cycle": 0}
+
+def write_handoff_state(state: dict, commit: str = "HEAD") -> None:
+    """Write handoff state to Git Notes"""
+    state_json = json.dumps(state, indent=2)
+    subprocess.run(
+        ["git", "notes", f"--ref={TDD_NOTES_REF}", "add", "-f", "-m", state_json, commit],
+        check=True
+    )
+
+def get_latest_handoff_commit() -> str:
+    """Find the most recent commit with a handoff note"""
+    result = subprocess.run(
+        ["git", "notes", f"--ref={TDD_NOTES_REF}", "list"],
+        capture_output=True, text=True
+    )
+    if result.stdout.strip():
+        # Format: <note-sha> <commit-sha>
+        first_line = result.stdout.strip().split('\n')[0]
+        return first_line.split()[1]
+    return "HEAD"
 ```
 
 ---
 
 ## 5. Implementation Patterns
 
-> **Note**: The orchestrator examples below reference `.tdd-state.json` for illustration. The actual implementation uses **Git Notes** for state management. See [research-java-sdk.md](research-java-sdk.md) for the authoritative Git Notes implementation.
-
-### 5.1 Python Orchestrator (Full Example)
+### 5.1 Python Orchestrator with Git Notes
 
 ```python
 #!/usr/bin/env python3
-"""TDD Workflow Orchestrator using Claude Agent SDK"""
+"""TDD Workflow Orchestrator using Claude Agent SDK with Git Notes"""
 
 import asyncio
 import json
+import subprocess
 from pathlib import Path
+from datetime import datetime
 from claude_agent_sdk import query, ClaudeAgentOptions, AgentDefinition
+
+TDD_NOTES_REF = "refs/notes/tdd-handoffs"
+
+class GitNotesManager:
+    """Manages TDD handoff state via Git Notes"""
+
+    def __init__(self, repo_path: Path):
+        self.repo_path = repo_path
+
+    def _run_git(self, *args, check=True) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            ["git", *args],
+            cwd=self.repo_path,
+            capture_output=True,
+            text=True,
+            check=check
+        )
+
+    def read_handoff(self, commit: str = "HEAD") -> dict:
+        """Read handoff state from Git Notes"""
+        try:
+            result = self._run_git("notes", f"--ref={TDD_NOTES_REF}", "show", commit)
+            return json.loads(result.stdout)
+        except (subprocess.CalledProcessError, json.JSONDecodeError):
+            return {"phase": "PLAN", "cycle": 1, "pending_tests": [], "completed_tests": []}
+
+    def write_handoff(self, state: dict, commit: str = "HEAD") -> None:
+        """Write handoff state to Git Notes"""
+        state["timestamp"] = datetime.utcnow().isoformat() + "Z"
+        state_json = json.dumps(state, indent=2)
+        self._run_git("notes", f"--ref={TDD_NOTES_REF}", "add", "-f", "-m", state_json, commit)
+
+    def get_head_commit(self) -> str:
+        """Get the current HEAD commit SHA"""
+        result = self._run_git("rev-parse", "HEAD")
+        return result.stdout.strip()
+
+    def commit_changes(self, message: str) -> str:
+        """Stage all changes and commit, return commit SHA"""
+        self._run_git("add", "-A")
+        self._run_git("commit", "-m", message, check=False)
+        return self.get_head_commit()
+
 
 class TDDOrchestrator:
     def __init__(self, project_root: str):
         self.project_root = Path(project_root)
-        self.state_file = self.project_root / ".tdd-state.json"
-
-    def load_state(self) -> dict:
-        if self.state_file.exists():
-            return json.loads(self.state_file.read_text())
-        return {"current_phase": "plan", "cycle": 0}
-
-    def save_state(self, state: dict):
-        self.state_file.write_text(json.dumps(state, indent=2))
+        self.git_notes = GitNotesManager(self.project_root)
 
     async def run_agent(self, agent_name: str, prompt: str, tools: list[str]) -> str:
         """Run a single agent phase"""
@@ -288,7 +330,7 @@ class TDDOrchestrator:
 
     async def run_test_list_agent(self, feature_request: str) -> dict:
         """Phase 1: Plan - Create/update test list"""
-        state = self.load_state()
+        state = self.git_notes.read_handoff()
 
         prompt = f"""You are the Test List Agent.
 
@@ -298,9 +340,9 @@ Current State: {json.dumps(state, indent=2)}
 
 Tasks:
 1. Read any existing test list
-2. Create or update the test list
+2. Create or update the test list file (test-list.md)
 3. Select the next pending test
-4. Update .tdd-state.json with the next test
+4. Commit the test list
 
 Output the selected test description clearly."""
 
@@ -310,11 +352,17 @@ Output the selected test description clearly."""
             ["Read", "Write", "Glob", "Grep"]
         )
 
-        return self.load_state()
+        # Commit and update state
+        commit_sha = self.git_notes.commit_changes("plan: update test list")
+        state["phase"] = "PLAN"
+        state["next_phase"] = "RED"
+        self.git_notes.write_handoff(state, commit_sha)
+
+        return state
 
     async def run_test_agent(self) -> dict:
         """Phase 2: Red - Write failing test"""
-        state = self.load_state()
+        state = self.git_notes.read_handoff()
 
         prompt = f"""You are the Test Agent (Red Phase).
 
@@ -325,8 +373,7 @@ State: {json.dumps(state, indent=2)}
 Tasks:
 1. Write a failing test for the current test case
 2. Run tests to verify your new test fails
-3. Commit the failing test
-4. Update .tdd-state.json with phase completion"""
+3. Commit the failing test"""
 
         await self.run_agent(
             "test-agent",
@@ -334,11 +381,18 @@ Tasks:
             ["Read", "Write", "Bash"]
         )
 
-        return self.load_state()
+        # Commit and update state
+        commit_sha = self.git_notes.commit_changes("test: add failing test")
+        state["phase"] = "RED"
+        state["next_phase"] = "GREEN"
+        state["test_result"] = "FAIL"
+        self.git_notes.write_handoff(state, commit_sha)
+
+        return state
 
     async def run_implementing_agent(self) -> dict:
         """Phase 3: Green - Make test pass"""
-        state = self.load_state()
+        state = self.git_notes.read_handoff()
 
         prompt = f"""You are the Implementing Agent (Green Phase).
 
@@ -350,8 +404,7 @@ Tasks:
 1. Read the failing test
 2. Write MINIMUM code to make it pass
 3. Run all tests to verify they pass
-4. Commit the implementation
-5. Update .tdd-state.json"""
+4. Commit the implementation"""
 
         await self.run_agent(
             "implementing-agent",
@@ -359,11 +412,18 @@ Tasks:
             ["Read", "Write", "Edit", "Bash"]
         )
 
-        return self.load_state()
+        # Commit and update state
+        commit_sha = self.git_notes.commit_changes("feat: implement to pass test")
+        state["phase"] = "GREEN"
+        state["next_phase"] = "REFACTOR"
+        state["test_result"] = "PASS"
+        self.git_notes.write_handoff(state, commit_sha)
+
+        return state
 
     async def run_refactor_agent(self) -> dict:
         """Phase 4: Refactor - Improve code"""
-        state = self.load_state()
+        state = self.git_notes.read_handoff()
 
         prompt = f"""You are the Refactor Agent.
 
@@ -375,8 +435,7 @@ Tasks:
 1. Review the test and implementation
 2. Refactor for clarity and maintainability
 3. Run tests to ensure they still pass
-4. Commit refactored code
-5. Update .tdd-state.json to complete cycle"""
+4. Commit refactored code"""
 
         await self.run_agent(
             "refactor-agent",
@@ -384,7 +443,17 @@ Tasks:
             ["Read", "Edit", "Bash", "Grep"]
         )
 
-        return self.load_state()
+        # Commit and update state
+        commit_sha = self.git_notes.commit_changes("refactor: improve code quality")
+        state["phase"] = "REFACTOR"
+        state["next_phase"] = "PLAN"
+        if state.get("current_test"):
+            state.setdefault("completed_tests", []).append(
+                state["current_test"].get("description", "")
+            )
+        self.git_notes.write_handoff(state, commit_sha)
+
+        return state
 
     async def run_cycle(self, feature_request: str):
         """Run one complete TDD cycle"""
@@ -401,7 +470,7 @@ Tasks:
         await self.run_refactor_agent()
 
         print("✅ Cycle complete!")
-        return self.load_state()
+        return self.git_notes.read_handoff()
 
 # Usage
 async def main():
@@ -416,45 +485,69 @@ if __name__ == "__main__":
 
 ```bash
 #!/bin/bash
-# tdd-orchestrator.sh - Simple shell-based TDD workflow
+# tdd-orchestrator.sh - Simple shell-based TDD workflow with Git Notes
 
 PROJECT_ROOT="${1:-.}"
 FEATURE="${2:-}"
+TDD_NOTES_REF="refs/notes/tdd-handoffs"
 
 if [ -z "$FEATURE" ]; then
     echo "Usage: $0 <project_root> <feature_request>"
     exit 1
 fi
 
-STATE_FILE="$PROJECT_ROOT/.tdd-state.json"
+cd "$PROJECT_ROOT" || exit 1
+
+# Helper function to read handoff state
+read_handoff() {
+    git notes --ref="$TDD_NOTES_REF" show HEAD 2>/dev/null || echo '{"phase":"PLAN","cycle":1}'
+}
+
+# Helper function to write handoff state
+write_handoff() {
+    local state="$1"
+    git notes --ref="$TDD_NOTES_REF" add -f -m "$state" HEAD
+}
 
 # Phase 1: Test List Agent
 echo "📋 Running Test List Agent..."
+STATE=$(read_handoff)
 claude --print --dangerously-skip-permissions \
-    --prompt "You are the Test List Agent. Create a test list for: $FEATURE" \
+    --prompt "You are the Test List Agent. Create a test list for: $FEATURE. Current state: $STATE" \
     --cwd "$PROJECT_ROOT" \
     --allowedTools "Read,Write,Glob,Grep"
+git add -A && git commit -m "plan: update test list"
+write_handoff '{"phase":"PLAN","next_phase":"RED"}'
 
 # Phase 2: Test Agent
 echo "🔴 Running Test Agent..."
+STATE=$(read_handoff)
 claude --print --dangerously-skip-permissions \
-    --prompt "You are the Test Agent. Read .tdd-state.json and write a failing test for the current test case." \
+    --prompt "You are the Test Agent. Write a failing test. State: $STATE" \
     --cwd "$PROJECT_ROOT" \
     --allowedTools "Read,Write,Bash"
+git add -A && git commit -m "test: add failing test"
+write_handoff '{"phase":"RED","next_phase":"GREEN","test_result":"FAIL"}'
 
 # Phase 3: Implementing Agent
 echo "🟢 Running Implementing Agent..."
+STATE=$(read_handoff)
 claude --print --dangerously-skip-permissions \
-    --prompt "You are the Implementing Agent. Read .tdd-state.json and make the failing test pass." \
+    --prompt "You are the Implementing Agent. Make the failing test pass. State: $STATE" \
     --cwd "$PROJECT_ROOT" \
     --allowedTools "Read,Write,Edit,Bash"
+git add -A && git commit -m "feat: implement to pass test"
+write_handoff '{"phase":"GREEN","next_phase":"REFACTOR","test_result":"PASS"}'
 
 # Phase 4: Refactor Agent
 echo "🔵 Running Refactor Agent..."
+STATE=$(read_handoff)
 claude --print --dangerously-skip-permissions \
-    --prompt "You are the Refactor Agent. Read .tdd-state.json and refactor the code." \
+    --prompt "You are the Refactor Agent. Refactor the code. State: $STATE" \
     --cwd "$PROJECT_ROOT" \
     --allowedTools "Read,Edit,Bash,Grep"
+git add -A && git commit -m "refactor: improve code quality"
+write_handoff '{"phase":"REFACTOR","next_phase":"PLAN"}'
 
 echo "✅ TDD cycle complete!"
 ```
@@ -557,7 +650,7 @@ See [spec-handoffs.md](spec-handoffs.md) for the full specification.
 
 ## 9. Open Questions for Implementation
 
-1. **Session ID persistence**: Should session IDs be stored in state file for potential resumption?
+1. **Session ID persistence**: Should session IDs be stored in Git Notes for potential resumption?
 2. **Parallel cycles**: Can multiple TDD cycles run in parallel for different features?
 3. **Human approval gates**: Should there be optional pause points for human review?
 4. **Rollback granularity**: Should rollback be to last commit or last known-good state?
@@ -589,18 +682,19 @@ MESSAGE_TYPES = {
 }
 ```
 
-## Appendix B: MCP Tools for TDD
+## Appendix B: Git Notes Helper Tools for TDD
 
 ```python
-# Suggested custom MCP tools for TDD workflow
-TDD_MCP_TOOLS = [
-    "get_tdd_state",      # Read current workflow state
-    "update_tdd_state",   # Update state after phase completion
-    "get_next_test",      # Get next pending test from list
-    "mark_test_complete", # Mark test as completed
-    "run_test_suite",     # Run tests with structured output
-    "check_test_failure", # Verify a specific test fails
-    "check_all_pass",     # Verify all tests pass
-    "git_commit_phase",   # Commit with TDD-formatted message
+# Suggested custom tools for TDD workflow with Git Notes
+TDD_GIT_TOOLS = [
+    "read_handoff_state",   # Read workflow state from Git Notes
+    "write_handoff_state",  # Write state to Git Notes after phase completion
+    "get_next_test",        # Get next pending test from list
+    "mark_test_complete",   # Mark test as completed in Git Notes
+    "run_test_suite",       # Run tests with structured output
+    "check_test_failure",   # Verify a specific test fails
+    "check_all_pass",       # Verify all tests pass
+    "git_commit_phase",     # Commit with TDD-formatted message
+    "git_notes_push",       # Push notes to remote repository
 ]
 ```

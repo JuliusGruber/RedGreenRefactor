@@ -83,10 +83,10 @@ After evaluating multiple approaches, the chosen handoff mechanism combines:
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
 │   ┌────────────────────────────────────────────────────────────────────┐    │
-│   │                    ORCHESTRATOR (JVM or Python)                     │    │
+│   │                    JAVA ORCHESTRATOR (JVM)                          │    │
 │   │  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐            │    │
-│   │  │ Anthropic    │   │ Git          │   │ State        │            │    │
-│   │  │ SDK          │   │ Library      │   │ Manager      │            │    │
+│   │  │ Anthropic    │   │ JGit         │   │ State        │            │    │
+│   │  │ Java SDK     │   │ Library      │   │ Manager      │            │    │
 │   │  │              │   │              │   │              │            │    │
 │   │  │ - Messages   │   │ - Read Notes │   │ - Phase      │            │    │
 │   │  │ - Streaming  │   │ - Write Notes│   │ - Cycle      │            │    │
