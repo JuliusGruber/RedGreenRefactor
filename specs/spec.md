@@ -248,7 +248,7 @@ The following diagram shows how the Test List Agent writes a test list and passe
 
 ## Test List Format
 
-The Test List Agent writes and maintains a test list file. Each test in the list has a status:
+The Test List Agent writes and maintains a test list file at `test-list.md` in the project root. Each test in the list has a status:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -284,6 +284,17 @@ Each TDD cycle produces **four commits**, one from each agent:
 │  4. 🔵 REFACTOR COMMIT │  Refactor Agent commits refactored code      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
+
+### Commit Message Conventions
+
+Each agent uses a specific commit message prefix:
+
+| Phase | Prefix | Example |
+|-------|--------|---------|
+| Plan | `plan:` | `plan: add test list for user authentication` |
+| Red | `test:` | `test: add failing test for user login` |
+| Green | `feat:` or `fix:` | `feat: implement user login validation` |
+| Refactor | `refactor:` | `refactor: extract authentication helper` |
 
 This ensures:
 - **Atomic changes**: Each commit represents a single phase

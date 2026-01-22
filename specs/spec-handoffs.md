@@ -48,12 +48,18 @@ Since each agent runs as an independent Claude Code session (no shared memory), 
 - ~~Should there be a handoff file (e.g., `.handoff.json`) in the repository?~~ → No, use Git Notes instead (non-intrusive)
 - ~~How does a session know what the previous session accomplished?~~ → Read Git Notes from latest commit
 
-### Pre-existing Codebase *(Open for future specification)*
+### Pre-existing Codebase *(Resolved)*
 
-- How does the workflow handle existing codebases with existing tests?
-- Should the Test List Agent account for existing tests when planning?
-- Do existing tests count toward "all tests must pass"?
-- Is this workflow scoped to new features only, or can it modify existing functionality?
+**Decision**: Support existing codebases, but only track TDD-created tests.
+
+| Question | Answer |
+|----------|--------|
+| Handle existing codebases? | Yes - workflow can run on projects with existing code and tests |
+| Account for existing tests when planning? | No - Test List Agent focuses only on new feature requirements |
+| Existing tests count toward "all tests must pass"? | No - only tests created by the TDD workflow are tracked |
+| Scoped to new features only? | Yes - workflow adds new features without modifying existing functionality |
+
+**Rationale**: This approach allows the workflow to be used on real projects without requiring a pristine codebase, while keeping the TDD cycle focused on the new feature being developed.
 
 ---
 

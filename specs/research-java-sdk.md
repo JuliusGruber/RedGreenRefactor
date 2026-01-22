@@ -96,7 +96,7 @@ The following table confirms which TDD workflow features are supported by the An
 | **Tool Results** | ✅ Yes | `ToolResultBlockParam` for returning tool execution results |
 | **Streaming** | ✅ Yes | `StreamResponse<RawMessageStreamEvent>` with auto-close |
 | **Async Execution** | ✅ Yes | `CompletableFuture<Message>` via `.async()` |
-| **Model Selection** | ✅ Yes | `Model.CLAUDE_SONNET_4_20250514` enum |
+| **Model Selection** | ✅ Yes | `Model.CLAUDE_OPUS_4_5_20251101` enum |
 | **Conversation History** | ✅ Yes | List of `MessageParam` for multi-turn conversations |
 | **Beta Features** | ✅ Yes | `BetaTool`, `BetaMessage` for experimental features |
 
@@ -242,7 +242,7 @@ public AgentDefinition testListAgent() {
         ```
         """,
         List.of(createReadTool(), createWriteTool(), createGlobTool(), createGrepTool()),
-        Model.CLAUDE_SONNET_4_20250514
+        Model.CLAUDE_OPUS_4_5_20251101
     );
 }
 
@@ -261,7 +261,7 @@ public AgentDefinition testAgent() {
         Write minimal, focused tests. Commit with message starting with "test:".
         """,
         List.of(createReadTool(), createWriteTool(), createBashTool()),
-        Model.CLAUDE_SONNET_4_20250514
+        Model.CLAUDE_OPUS_4_5_20251101
     );
 }
 
@@ -281,7 +281,7 @@ public AgentDefinition implementingAgent() {
         Commit with message starting with "feat:" or "fix:".
         """,
         List.of(createReadTool(), createWriteTool(), createEditTool(), createBashTool()),
-        Model.CLAUDE_SONNET_4_20250514
+        Model.CLAUDE_OPUS_4_5_20251101
     );
 }
 
@@ -301,7 +301,7 @@ public AgentDefinition refactorAgent() {
         Commit with message starting with "refactor:".
         """,
         List.of(createReadTool(), createEditTool(), createBashTool(), createGrepTool()),
-        Model.CLAUDE_SONNET_4_20250514
+        Model.CLAUDE_OPUS_4_5_20251101
     );
 }
 ```
@@ -746,7 +746,7 @@ public class TddOrchestrator {
             {"test": "description of the test", "complete": false}
             ```
             """,
-            Model.CLAUDE_SONNET_4_20250514
+            Model.CLAUDE_OPUS_4_5_20251101
         ),
         HandoffState.Phase.RED, new AgentConfig(
             "Test Agent",
@@ -759,7 +759,7 @@ public class TddOrchestrator {
 
             Write minimal, focused tests. Commit with message starting with "test:".
             """,
-            Model.CLAUDE_SONNET_4_20250514
+            Model.CLAUDE_OPUS_4_5_20251101
         ),
         HandoffState.Phase.GREEN, new AgentConfig(
             "Implementing Agent",
@@ -773,7 +773,7 @@ public class TddOrchestrator {
             Do NOT over-engineer. Write just enough code.
             Commit with message starting with "feat:" or "fix:".
             """,
-            Model.CLAUDE_SONNET_4_20250514
+            Model.CLAUDE_OPUS_4_5_20251101
         ),
         HandoffState.Phase.REFACTOR, new AgentConfig(
             "Refactor Agent",
@@ -787,7 +787,7 @@ public class TddOrchestrator {
             May refactor any code in the codebase.
             Commit with message starting with "refactor:".
             """,
-            Model.CLAUDE_SONNET_4_20250514
+            Model.CLAUDE_OPUS_4_5_20251101
         )
     );
 
@@ -905,7 +905,7 @@ import com.anthropic.helpers.MessageAccumulator;
 
 public Message invokeWithStreaming(String taskPrompt, Consumer<String> onToken) {
     MessageCreateParams params = MessageCreateParams.builder()
-        .model(Model.CLAUDE_SONNET_4_20250514)
+        .model(Model.CLAUDE_OPUS_4_5_20251101)
         .maxTokens(4096L)
         .system(systemPrompt)
         .addUserMessage(taskPrompt)
@@ -943,7 +943,7 @@ public class AsyncTddOrchestrator {
 
     public CompletableFuture<Message> invokeAgentAsync(String systemPrompt, String task) {
         MessageCreateParams params = MessageCreateParams.builder()
-            .model(Model.CLAUDE_SONNET_4_20250514)
+            .model(Model.CLAUDE_OPUS_4_5_20251101)
             .maxTokens(4096L)
             .system(systemPrompt)
             .addUserMessage(task)
@@ -1246,14 +1246,21 @@ public void recordError(ObjectId commitId, Exception error, HandoffState state)
 
 ---
 
-## 14. Open Questions for Implementation
+## 14. Implementation Decisions (Resolved)
 
-1. **Spring AI Integration**: Should we use Spring AI's AnthropicChatModel for better DI support?
-2. **Parallel cycles**: Can multiple TDD cycles run in parallel using CompletableFuture?
-3. **Human approval gates**: Should there be optional pause points for human review?
-4. **Rollback granularity**: Should rollback be to last commit or last known-good state?
-5. **Test framework detection**: Should orchestrator auto-detect JUnit/TestNG/etc.?
-6. **Tool execution sandboxing**: How to safely execute bash commands?
+| Question | Decision |
+|----------|----------|
+| **Spring AI Integration** | No - use raw Anthropic SDK for simplicity and fewer dependencies |
+| **Parallel cycles** | No - strictly sequential, one test at a time |
+| **Human approval gates** | No - fully automated, no human intervention required |
+| **Rollback granularity** | Rollback to the commit before the current phase started |
+| **Test framework detection** | Auto-detect based on project files (pom.xml, package.json, etc.) |
+| **Tool execution sandboxing** | No sandboxing - trust the agents |
+| **Default model** | Claude Opus 4.5 (`claude-opus-4-5-20251101`) |
+| **Max tokens** | Configurable per-agent |
+| **Logging** | Configurable via CLI flag (Normal as default) |
+| **Test list location** | `test-list.md` in project root (Markdown with checkboxes) |
+| **Commit prefixes** | `plan:`, `test:`, `feat:/fix:`, `refactor:` |
 
 ---
 
