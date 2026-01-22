@@ -34,8 +34,8 @@ This document provides a detailed implementation plan for building the multi-age
 ## Phase 1: Project Foundation
 
 ### 1.1 Project Setup
-- [ ] Create Java project structure with Gradle
-- [ ] Configure `build.gradle.kts` with all dependencies:
+- [ ] Create Java project structure with Maven
+- [ ] Configure `pom.xml` with all dependencies:
   - `com.anthropic:anthropic-java:2.11.1`
   - `org.eclipse.jgit:org.eclipse.jgit:6.10.0.202406032230-r`
   - `com.fasterxml.jackson.core:jackson-databind:2.18.2`
@@ -67,7 +67,7 @@ This document provides a detailed implementation plan for building the multi-age
 - [ ] Create `CycleResult` and `WorkflowResult` records
 
 ### 1.3 Verification Checklist
-- [ ] Verify project compiles: `./gradlew build`
+- [ ] Verify project compiles: `mvn compile`
 - [ ] Verify dependencies resolve correctly
 - [ ] Verify JSON serialization/deserialization works for HandoffState
 - [ ] Verify data models have proper equals/hashCode/toString
@@ -449,31 +449,75 @@ src/
 
 ## Dependencies Summary
 
-```kotlin
-// build.gradle.kts
-dependencies {
-    // Anthropic Java SDK
-    implementation("com.anthropic:anthropic-java:2.11.1")
+```xml
+<!-- pom.xml -->
+<dependencies>
+    <!-- Anthropic Java SDK -->
+    <dependency>
+        <groupId>com.anthropic</groupId>
+        <artifactId>anthropic-java</artifactId>
+        <version>2.11.1</version>
+    </dependency>
 
-    // JGit for Git Notes
-    implementation("org.eclipse.jgit:org.eclipse.jgit:6.10.0.202406032230-r")
+    <!-- JGit for Git Notes -->
+    <dependency>
+        <groupId>org.eclipse.jgit</groupId>
+        <artifactId>org.eclipse.jgit</artifactId>
+        <version>6.10.0.202406032230-r</version>
+    </dependency>
 
-    // JSON processing
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
-    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.18.2")
+    <!-- JSON processing -->
+    <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>2.18.2</version>
+    </dependency>
+    <dependency>
+        <groupId>com.fasterxml.jackson.datatype</groupId>
+        <artifactId>jackson-datatype-jsr310</artifactId>
+        <version>2.18.2</version>
+    </dependency>
 
-    // Logging
-    implementation("org.slf4j:slf4j-api:2.0.9")
-    runtimeOnly("org.slf4j:slf4j-simple:2.0.9")
+    <!-- Logging -->
+    <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>2.0.9</version>
+    </dependency>
+    <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-simple</artifactId>
+        <version>2.0.9</version>
+        <scope>runtime</scope>
+    </dependency>
 
-    // CLI parsing
-    implementation("info.picocli:picocli:4.7.5")
+    <!-- CLI parsing -->
+    <dependency>
+        <groupId>info.picocli</groupId>
+        <artifactId>picocli</artifactId>
+        <version>4.7.5</version>
+    </dependency>
 
-    // Testing
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.1")
-    testImplementation("org.mockito:mockito-core:5.8.0")
-    testImplementation("org.assertj:assertj-core:3.24.2")
-}
+    <!-- Testing -->
+    <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>5.10.1</version>
+        <scope>test</scope>
+    </dependency>
+    <dependency>
+        <groupId>org.mockito</groupId>
+        <artifactId>mockito-core</artifactId>
+        <version>5.8.0</version>
+        <scope>test</scope>
+    </dependency>
+    <dependency>
+        <groupId>org.assertj</groupId>
+        <artifactId>assertj-core</artifactId>
+        <version>3.24.2</version>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
 ```
 
 ---
