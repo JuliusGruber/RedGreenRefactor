@@ -298,7 +298,7 @@ This ensures:
 - **Clean Code**: Dedicated refactoring phase ensures maintainability
 - **Traceability**: Clear handoffs between phases
 
-## Implementation Decision: Java SDK
+## Implementation Decision: Java SDK with Maven
 
 After evaluating available options for the orchestrator implementation, **we have decided to use the Anthropic Java SDK** with Git Notes for agent handoffs.
 
@@ -307,6 +307,8 @@ After evaluating available options for the orchestrator implementation, **we hav
 - Enterprise maturity with proven concurrency and error handling
 - Git Notes provide non-intrusive, version-controlled handoff state
 - No external dependencies beyond Git itself
+
+**Build tool:** Maven is the chosen build tool for dependency management and project structure.
 
 For full implementation details, see [Java SDK Research](research-java-sdk.md).
 

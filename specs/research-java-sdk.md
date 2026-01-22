@@ -117,7 +117,7 @@ Unlike the Python Claude Agent SDK, the following require custom code:
 
 ## 3. SDK Installation & Setup
 
-### 3.1 Maven (`pom.xml`)
+### 3.1 Maven (`pom.xml`) — Chosen Build Tool
 
 ```xml
 <dependencies>
@@ -151,33 +151,9 @@ Unlike the Python Claude Agent SDK, the following require custom code:
 </dependencies>
 ```
 
-### 3.2 Gradle (`build.gradle.kts`)
+**Requirements:** Java 17 or later (Java 21 recommended)
 
-```kotlin
-plugins {
-    java
-    application
-}
-
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(21))
-    }
-}
-
-dependencies {
-    implementation("com.anthropic:anthropic-java:2.11.1")
-    implementation("org.eclipse.jgit:org.eclipse.jgit:6.10.0.202406032230-r")
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
-    implementation("org.slf4j:slf4j-simple:2.0.9")
-}
-
-application {
-    mainClass.set("com.redgreenrefactor.TDDOrchestrator")
-}
-```
-
-**Requirements:** Java 8 or later (Java 17+ recommended)
+> **Build Tool Decision:** Maven is the chosen build tool for this project. Gradle may be considered as an alternative in the future but is not the primary approach.
 
 ### 3.3 Basic Client Setup
 
@@ -1248,7 +1224,7 @@ public void recordError(ObjectId commitId, Exception error, HandoffState state)
 ## 13. Implementation Roadmap
 
 ### Phase 1: Foundation
-- Set up Java project with Maven/Gradle
+- Set up Java project with Maven
 - Integrate Anthropic Java SDK
 - Integrate JGit for Git Notes operations
 - Define HandoffState data model
