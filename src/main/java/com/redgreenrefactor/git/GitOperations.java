@@ -172,15 +172,7 @@ public class GitOperations implements AutoCloseable {
             diffFormatter.setRepository(repository);
             diffFormatter.setDetectRenames(true);
 
-            AbstractTreeIterator oldTreeIter;
-            if (commit.getParentCount() > 0) {
-                RevCommit parent = revWalk.parseCommit(commit.getParent(0).getId());
-                oldTreeIter = prepareTreeParser(parent);
-            } else {
-                // First commit - compare against empty tree
-                oldTreeIter = new EmptyTreeIterator();
-            }
-
+            AbstractTreeIterator oldTreeIter = prepareParentTreeIterator(revWalk, commit);
             AbstractTreeIterator newTreeIter = prepareTreeParser(commit);
 
             List<DiffEntry> diffs = diffFormatter.scan(oldTreeIter, newTreeIter);
@@ -217,14 +209,7 @@ public class GitOperations implements AutoCloseable {
             diffFormatter.setRepository(repository);
             diffFormatter.setDetectRenames(true);
 
-            AbstractTreeIterator oldTreeIter;
-            if (commit.getParentCount() > 0) {
-                RevCommit parent = revWalk.parseCommit(commit.getParent(0).getId());
-                oldTreeIter = prepareTreeParser(parent);
-            } else {
-                oldTreeIter = new EmptyTreeIterator();
-            }
-
+            AbstractTreeIterator oldTreeIter = prepareParentTreeIterator(revWalk, commit);
             AbstractTreeIterator newTreeIter = prepareTreeParser(commit);
 
             List<DiffEntry> diffs = diffFormatter.scan(oldTreeIter, newTreeIter);
@@ -276,6 +261,14 @@ public class GitOperations implements AutoCloseable {
         } catch (IOException e) {
             throw new GitOperationException("Failed to get commit message for " + commitId.name(), e);
         }
+    }
+
+    private AbstractTreeIterator prepareParentTreeIterator(RevWalk revWalk, RevCommit commit) throws IOException {
+        if (commit.getParentCount() > 0) {
+            RevCommit parent = revWalk.parseCommit(commit.getParent(0).getId());
+            return prepareTreeParser(parent);
+        }
+        return new EmptyTreeIterator();
     }
 
     private AbstractTreeIterator prepareTreeParser(RevCommit commit) throws IOException {
