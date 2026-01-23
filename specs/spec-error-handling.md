@@ -29,7 +29,7 @@ The orchestrator is responsible for detecting failures and coordinating recovery
 | Failure | Detection | Recovery |
 |---------|-----------|----------|
 | Refactoring breaks tests | Tests fail after refactoring | Git rollback to pre-refactor commit, re-run Refactor Agent |
-| Retry attempts | Track in Git Notes | Maximum 3 retries before escalating to human review |
+| Retry attempts | Track in Git Notes | Maximum 3 retries, then abort workflow and record error |
 
 ### General Recovery
 
@@ -37,7 +37,7 @@ The orchestrator is responsible for detecting failures and coordinating recovery
 |----------|------------|
 | Who detects failures? | **Orchestrator** parses tool output and test results |
 | Rollback strategy | Git revert to last known-good commit (identified via Git Notes) |
-| Restart vs abort | Retry current phase up to 3 times, then abort cycle with error state in notes |
+| Restart vs abort | Retry current phase up to 3 times, then abort workflow entirely with error state in notes (no human intervention) |
 
 ### Edge Cases
 
@@ -77,21 +77,21 @@ Retries use exponential backoff:
 | 1 | 1 second |
 | 2 | 2 seconds |
 | 3 | 4 seconds |
-| After 3 | Abort and record error |
+| After 3 | Abort workflow entirely and record error state in Git Notes (no human intervention) |
 
 ## Error State in Git Notes
 
-When an error occurs, the orchestrator records it in the handoff note:
+When an error occurs, the orchestrator records it in the handoff note (camelCase):
 
 ```json
 {
   "phase": "GREEN",
   "error": "Test still failing after implementation",
-  "error_details": {
+  "errorDetails": {
     "type": "TestFailure",
     "message": "Expected 200, got 404"
   },
-  "retry_count": 2
+  "retryCount": 2
 }
 ```
 

@@ -177,7 +177,7 @@ application {
 }
 ```
 
-**Requirements:** Java 8 or later (Java 17+ recommended)
+**Requirements:** Java 21 (required for records and modern language features)
 
 ### 3.3 Basic Client Setup
 
@@ -362,6 +362,8 @@ All agents have access to all tools:
 
 ## 5. Tool Definitions via JSON Schema
 
+Tool names use PascalCase to match Claude Code conventions.
+
 ```java
 import com.anthropic.models.messages.Tool;
 import com.anthropic.core.JsonValue;
@@ -370,7 +372,7 @@ public class TDDTools {
 
     public static Tool createReadTool() {
         return Tool.builder()
-            .name("read_file")
+            .name("Read")
             .description("Read the contents of a file")
             .inputSchema(Tool.InputSchema.builder()
                 .type(JsonValue.Type.OBJECT)
@@ -388,7 +390,7 @@ public class TDDTools {
 
     public static Tool createWriteTool() {
         return Tool.builder()
-            .name("write_file")
+            .name("Write")
             .description("Write content to a file")
             .inputSchema(Tool.InputSchema.builder()
                 .type(JsonValue.Type.OBJECT)
@@ -410,7 +412,7 @@ public class TDDTools {
 
     public static Tool createEditTool() {
         return Tool.builder()
-            .name("edit_file")
+            .name("Edit")
             .description("Edit a file by replacing text")
             .inputSchema(Tool.InputSchema.builder()
                 .type(JsonValue.Type.OBJECT)
@@ -436,7 +438,7 @@ public class TDDTools {
 
     public static Tool createBashTool() {
         return Tool.builder()
-            .name("bash")
+            .name("Bash")
             .description("Execute a bash command")
             .inputSchema(Tool.InputSchema.builder()
                 .type(JsonValue.Type.OBJECT)
@@ -454,7 +456,7 @@ public class TDDTools {
 
     public static Tool createGlobTool() {
         return Tool.builder()
-            .name("glob")
+            .name("Glob")
             .description("Find files matching a glob pattern")
             .inputSchema(Tool.InputSchema.builder()
                 .type(JsonValue.Type.OBJECT)
@@ -472,7 +474,7 @@ public class TDDTools {
 
     public static Tool createGrepTool() {
         return Tool.builder()
-            .name("grep")
+            .name("Grep")
             .description("Search for text patterns in files")
             .inputSchema(Tool.InputSchema.builder()
                 .type(JsonValue.Type.OBJECT)
@@ -661,50 +663,39 @@ public class GitNotesManager {
 
 ### 7.2 Handoff State Data Model
 
-```java
-import com.fasterxml.jackson.annotation.JsonProperty;
+Uses camelCase throughout (Java and JSON).
 
+```java
 public class HandoffState {
     public enum Phase {
         PLAN, RED, GREEN, REFACTOR, COMPLETE
     }
 
-    @JsonProperty("phase")
-    private Phase currentPhase;
-
-    @JsonProperty("next_phase")
+    private Phase phase;
     private Phase nextPhase;
-
-    @JsonProperty("cycle")
     private int cycleNumber;
-
-    @JsonProperty("current_test")
     private TestCase currentTest;
-
-    @JsonProperty("completed_tests")
     private List<String> completedTests;
-
-    @JsonProperty("pending_tests")
     private List<String> pendingTests;
-
-    @JsonProperty("test_result")
     private String testResult;
-
-    @JsonProperty("error")
     private String error;
+    private ErrorDetails errorDetails;
+    private int retryCount;
 
     // Getters, setters, builders...
 }
 
 public class TestCase {
-    @JsonProperty("description")
     private String description;
-
-    @JsonProperty("test_file")
     private String testFile;
-
-    @JsonProperty("impl_file")
     private String implFile;
+
+    // Getters, setters...
+}
+
+public class ErrorDetails {
+    private String type;
+    private String message;
 
     // Getters, setters...
 }
@@ -769,17 +760,25 @@ public class TddOrchestrator {
             You are the Test List Agent in a TDD workflow.
             Your responsibilities:
             1. Analyze feature requirements
-            2. Create/update the test list file (test-list.md)
+            2. Create/update the test list file (test-list.md in project root)
             3. Select the next pending test
             4. Determine when the feature is complete
 
             You DO NOT write actual test code—only plan tests.
-            Commit with message starting with "plan:".
+            Commit via Bash with message starting with "plan:".
 
             Output your selected test in a JSON block:
             ```json
-            {"test": "description of the test", "complete": false}
+            {
+              "currentTest": {
+                "description": "test description",
+                "testFile": "src/test/java/...",
+                "implFile": "src/main/java/..."
+              },
+              "nextPhase": "RED"
+            }
             ```
+            Or when complete: {"currentTest": null, "nextPhase": "COMPLETE"}
             """,
             Model.CLAUDE_OPUS_4_5_20251101
         ),
@@ -788,11 +787,11 @@ public class TddOrchestrator {
             """
             You are the Test Agent (Red Phase) in a TDD workflow.
             Your responsibilities:
-            1. Receive ONE test case description
+            1. Receive ONE test case description with file paths
             2. Write a failing test for that case
             3. The test must compile but FAIL when run
 
-            Write minimal, focused tests. Commit with message starting with "test:".
+            Write minimal, focused tests. Commit via Bash with message starting with "test:".
             """,
             Model.CLAUDE_OPUS_4_5_20251101
         ),
@@ -806,7 +805,7 @@ public class TddOrchestrator {
             3. Ensure all tests pass
 
             Do NOT over-engineer. Write just enough code.
-            Commit with message starting with "feat:" or "fix:".
+            Commit via Bash with message starting with "feat:" or "fix:".
             """,
             Model.CLAUDE_OPUS_4_5_20251101
         ),
@@ -820,7 +819,8 @@ public class TddOrchestrator {
             3. Ensure all tests still pass
 
             May refactor any code in the codebase.
-            Commit with message starting with "refactor:".
+            Commit via Bash with message starting with "refactor:".
+            If no refactoring needed, use: git commit --allow-empty -m "refactor: no changes needed"
             """,
             Model.CLAUDE_OPUS_4_5_20251101
         )
@@ -887,16 +887,34 @@ public class TddOrchestrator {
         Message response = invokeAgent(config, prompt);
         PhaseResult result = processAgentResponse(phase, response);
 
-        ObjectId commitId = gitOps.commitChanges(result.getCommitMessage());
+        // Agent commits via Bash tool; get the commit ID for the note
+        ObjectId commitId = gitOps.getLatestCommit();
+
+        // Fixed phase sequence: PLAN → RED → GREEN → REFACTOR → PLAN (or COMPLETE)
+        Phase nextPhase = getNextPhase(phase);
+        if (phase == HandoffState.Phase.PLAN && result.isComplete()) {
+            nextPhase = HandoffState.Phase.COMPLETE;
+        }
 
         HandoffState nextState = currentState.toBuilder()
-            .currentPhase(phase)
-            .nextPhase(getNextPhase(phase, result))
+            .phase(phase)
+            .nextPhase(nextPhase)
             .build();
 
+        // Orchestrator only writes Git Notes (agents commit their own changes)
         gitNotesManager.writeHandoff(commitId, nextState);
 
         return nextState;
+    }
+
+    private Phase getNextPhase(Phase current) {
+        return switch (current) {
+            case PLAN -> Phase.RED;
+            case RED -> Phase.GREEN;
+            case GREEN -> Phase.REFACTOR;
+            case REFACTOR -> Phase.PLAN;
+            case COMPLETE -> Phase.COMPLETE;
+        };
     }
 
     private Message invokeAgent(AgentConfig config, String prompt) {
@@ -1016,50 +1034,52 @@ public class AsyncTddOrchestrator {
 │  └── Note (refs/notes/tdd-handoffs):                                        │
 │      {                                                                       │
 │        "phase": "PLAN",                                                      │
-│        "next_phase": "RED",                                                  │
-│        "cycle": 1,                                                           │
-│        "current_test": {                                                     │
-│          "description": "User can log in with valid credentials"            │
+│        "nextPhase": "RED",                                                   │
+│        "cycleNumber": 1,                                                     │
+│        "currentTest": {                                                      │
+│          "description": "User can log in with valid credentials",           │
+│          "testFile": "src/test/java/UserLoginTest.java",                     │
+│          "implFile": "src/main/java/auth/Login.java"                         │
 │        },                                                                    │
-│        "pending_tests": ["User can log out", "Invalid creds return error"], │
-│        "completed_tests": []                                                 │
+│        "pendingTests": ["User can log out", "Invalid creds return error"],  │
+│        "completedTests": []                                                  │
 │      }                                                                       │
 │                           │                                                  │
 │                           ▼                                                  │
 │  COMMIT 2: def456 (Red)                                                      │
 │  ├── Message: "test: add failing test for user login"                       │
-│  ├── Files: tests/test_user_login.py                                        │
+│  ├── Files: src/test/java/UserLoginTest.java                                │
 │  └── Note (refs/notes/tdd-handoffs):                                        │
 │      {                                                                       │
 │        "phase": "RED",                                                       │
-│        "next_phase": "GREEN",                                                │
-│        "cycle": 1,                                                           │
-│        "test_result": "FAIL"                                                 │
+│        "nextPhase": "GREEN",                                                 │
+│        "cycleNumber": 1,                                                     │
+│        "testResult": "FAIL"                                                  │
 │      }                                                                       │
 │                           │                                                  │
 │                           ▼                                                  │
 │  COMMIT 3: ghi789 (Green)                                                    │
 │  ├── Message: "feat: implement user login"                                  │
-│  ├── Files: src/auth/login.py                                               │
+│  ├── Files: src/main/java/auth/Login.java                                   │
 │  └── Note (refs/notes/tdd-handoffs):                                        │
 │      {                                                                       │
 │        "phase": "GREEN",                                                     │
-│        "next_phase": "REFACTOR",                                             │
-│        "cycle": 1,                                                           │
-│        "test_result": "PASS"                                                 │
+│        "nextPhase": "REFACTOR",                                              │
+│        "cycleNumber": 1,                                                     │
+│        "testResult": "PASS"                                                  │
 │      }                                                                       │
 │                           │                                                  │
 │                           ▼                                                  │
 │  COMMIT 4: jkl012 (Refactor)                                                 │
 │  ├── Message: "refactor: clean up login implementation"                     │
-│  ├── Files: src/auth/login.py, tests/test_user_login.py                     │
+│  ├── Files: src/main/java/auth/Login.java, src/test/java/UserLoginTest.java │
 │  └── Note (refs/notes/tdd-handoffs):                                        │
 │      {                                                                       │
 │        "phase": "REFACTOR",                                                  │
-│        "next_phase": "PLAN",                                                 │
-│        "cycle": 1,                                                           │
-│        "completed_tests": ["User can log in with valid credentials"],       │
-│        "test_result": "PASS"                                                 │
+│        "nextPhase": "PLAN",                                                  │
+│        "cycleNumber": 1,                                                     │
+│        "completedTests": ["User can log in with valid credentials"],        │
+│        "testResult": "PASS"                                                  │
 │      }                                                                       │
 │                           │                                                  │
 │                           ▼                                                  │
@@ -1178,15 +1198,18 @@ public class RetryHandler {
 
 ### 10.4 Error State in Notes
 
+After 3 retries, the workflow aborts entirely and records the error state (no human intervention).
+
 ```java
-public void recordError(ObjectId commitId, Exception error, HandoffState state)
+public void recordError(ObjectId commitId, Exception error, HandoffState state, int retryCount)
         throws Exception {
     HandoffState errorState = state.toBuilder()
         .error(error.getMessage())
         .errorDetails(new ErrorDetails(
-            error.getClass().getName(),
-            Arrays.toString(error.getStackTrace())
+            error.getClass().getSimpleName(),
+            error.getMessage()
         ))
+        .retryCount(retryCount)
         .build();
 
     gitNotesManager.writeHandoff(commitId, errorState);

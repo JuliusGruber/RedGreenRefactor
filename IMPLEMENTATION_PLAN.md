@@ -44,7 +44,7 @@ This document provides a detailed implementation plan for building the multi-age
 - [ ] Create package structure: `com.redgreenrefactor.{orchestrator,agent,git,tool,model}`
 
 ### 1.2 Data Models
-- [ ] Create `HandoffState` record with JSON annotations:
+- [ ] Create `HandoffState` record with JSON annotations (camelCase throughout):
   - `phase` (enum: PLAN, RED, GREEN, REFACTOR, COMPLETE)
   - `nextPhase`
   - `cycleNumber`
@@ -52,7 +52,9 @@ This document provides a detailed implementation plan for building the multi-age
   - `completedTests` (List<String>)
   - `pendingTests` (List<String>)
   - `testResult` (PASS/FAIL)
-  - `error` (nullable)
+  - `error` (nullable String)
+  - `errorDetails` (nullable object with `type` and `message`)
+  - `retryCount` (int, default 0)
 - [ ] Create `TestCase` record:
   - `description`
   - `testFile`
@@ -105,13 +107,13 @@ This document provides a detailed implementation plan for building the multi-age
 ## Phase 3: Tool Definitions and Execution
 
 ### 3.1 Tool Definitions (JSON Schema)
-- [ ] Implement `TDDTools` class with static tool builders:
-  - `createReadTool()` - read file contents
-  - `createWriteTool()` - write file contents
-  - `createEditTool()` - edit file by replacing text
-  - `createBashTool()` - execute shell commands
-  - `createGlobTool()` - find files by pattern
-  - `createGrepTool()` - search for patterns in files
+- [ ] Implement `TDDTools` class with static tool builders (PascalCase names):
+  - `createReadTool()` - "Read" - read file contents
+  - `createWriteTool()` - "Write" - write file contents
+  - `createEditTool()` - "Edit" - edit file by replacing text
+  - `createBashTool()` - "Bash" - execute shell commands
+  - `createGlobTool()` - "Glob" - find files by pattern
+  - `createGrepTool()` - "Grep" - search for patterns in files
 - [ ] Each tool uses `Tool.builder()` with proper JSON Schema
 
 ### 3.2 Tool Execution Handlers
@@ -127,12 +129,12 @@ This document provides a detailed implementation plan for building the multi-age
 - [ ] Implement timeout handling for bash commands
 
 ### 3.3 Verification Checklist
-- [ ] Test read_file tool reads file correctly
-- [ ] Test write_file tool creates/overwrites files
-- [ ] Test edit_file tool performs text replacement
-- [ ] Test bash tool executes commands and captures output
-- [ ] Test glob tool finds files matching patterns
-- [ ] Test grep tool finds text patterns
+- [ ] Test Read tool reads file correctly
+- [ ] Test Write tool creates/overwrites files
+- [ ] Test Edit tool performs text replacement
+- [ ] Test Bash tool executes commands and captures output
+- [ ] Test Glob tool finds files matching patterns
+- [ ] Test Grep tool finds text patterns
 
 ---
 
@@ -141,21 +143,32 @@ This document provides a detailed implementation plan for building the multi-age
 ### 4.1 Test List Agent (Planning)
 - [ ] Define system prompt:
   - Analyze feature requirements
-  - Create/update test list file (test-list.md)
+  - Create/update test list file (`test-list.md` in project root, using markdown checkboxes)
   - Select next pending test
   - Determine when feature is complete
-  - Output JSON: `{"test": "description", "complete": false}`
-  - Commit with "plan:" prefix
-- [ ] Tools: all (read, write, edit, bash, glob, grep)
+  - Output JSON with full TestCase and next phase:
+    ```json
+    {
+      "currentTest": {
+        "description": "test description",
+        "testFile": "src/test/java/...",
+        "implFile": "src/main/java/..."
+      },
+      "nextPhase": "RED"
+    }
+    ```
+    Or when complete: `{"currentTest": null, "nextPhase": "COMPLETE"}`
+  - Commit with "plan:" prefix via Bash tool
+- [ ] Tools: all (Read, Write, Edit, Bash, Glob, Grep)
 - [ ] Model: Claude Opus 4.5
 
 ### 4.2 Test Agent (Red Phase)
 - [ ] Define system prompt:
-  - Receive ONE test case description
+  - Receive ONE test case description with file paths
   - Write a failing test for that case
   - Test must compile but FAIL when run
-  - Commit with "test:" prefix
-- [ ] Tools: all (read, write, edit, bash, glob, grep)
+  - Commit with "test:" prefix via Bash tool
+- [ ] Tools: all (Read, Write, Edit, Bash, Glob, Grep)
 - [ ] Model: Claude Opus 4.5
 - [ ] Test execution verification:
   - Run ALL tests (not just the new one)
@@ -167,8 +180,8 @@ This document provides a detailed implementation plan for building the multi-age
   - Read the failing test
   - Write MINIMUM code to make it pass
   - Ensure all tests pass
-  - Commit with "feat:" or "fix:" prefix
-- [ ] Tools: all (read, write, edit, bash, glob, grep)
+  - Commit with "feat:" or "fix:" prefix via Bash tool
+- [ ] Tools: all (Read, Write, Edit, Bash, Glob, Grep)
 - [ ] Model: Claude Opus 4.5
 - [ ] Must verify all tests pass before completing
 
@@ -177,8 +190,9 @@ This document provides a detailed implementation plan for building the multi-age
   - Review implementation AND test code
   - Refactor for clarity, maintainability
   - Ensure all tests still pass
-  - Commit with "refactor:" prefix
-- [ ] Tools: all (read, write, edit, bash, glob, grep)
+  - Commit with "refactor:" prefix via Bash tool
+  - If no refactoring needed, use `git commit --allow-empty -m "refactor: no changes needed"`
+- [ ] Tools: all (Read, Write, Edit, Bash, Glob, Grep)
 - [ ] Model: Claude Opus 4.5
 - [ ] Must verify all tests pass after refactoring
 
@@ -221,18 +235,18 @@ This document provides a detailed implementation plan for building the multi-age
 - [ ] Implement `runPhase(Phase, HandoffState)`:
   - Get agent config for phase
   - Build prompt with context
-  - Invoke agent
+  - Invoke agent (agent commits via Bash tool)
   - Process response
-  - Commit changes
-  - Write handoff note
+  - Write handoff note to the agent's commit
   - Return updated state
+  - Note: Agents are responsible for committing; orchestrator only writes Git Notes
 
 ### 5.5 Main Orchestrator
 - [ ] Implement `runWorkflow(featureRequest)`:
   - Run planning phase to get initial test list
   - Loop through TDD cycles until complete
-  - Each cycle: RED → GREEN → REFACTOR → PLAN
-  - Detect completion when Test List Agent signals done
+  - Fixed phase sequence: PLAN → RED → GREEN → REFACTOR → PLAN (loop) or COMPLETE
+  - Detect completion when Test List Agent outputs `{"nextPhase": "COMPLETE"}`
   - Return `WorkflowResult`
 
 ### 5.6 Verification Checklist
@@ -275,18 +289,19 @@ This document provides a detailed implementation plan for building the multi-age
 - [ ] Implement `rollbackAndRetry(phase, error)`
 
 ### 6.4 Error State Recording
-- [ ] Record errors in Git Notes:
+- [ ] Record errors in Git Notes (camelCase):
   ```json
   {
     "error": "message",
-    "error_details": {
+    "errorDetails": {
       "type": "TestFailure",
       "message": "Expected 200, got 404"
     },
-    "retry_count": 2
+    "retryCount": 2
   }
   ```
 - [ ] Implement `recordError(commitId, exception, state)`
+- [ ] After 3 retries: abort workflow entirely and record error state (no human intervention)
 
 ### 6.5 Verification Checklist
 - [ ] Test retry logic with simulated failures
@@ -324,7 +339,14 @@ This document provides a detailed implementation plan for building the multi-age
   - `TDD_PROJECT_ROOT` - project directory (default: current)
   - `TDD_MAX_RETRIES` - retry limit (default: 3)
   - `TDD_MODEL` - model to use (default: claude-opus-4-5-20251101)
-- [ ] Support config file `tdd.properties` (standard Java properties format)
+- [ ] Support config file `tdd.properties` (standard Java properties format):
+  - `bash.timeout=120` - Bash command timeout in seconds (default: 120)
+  - `test.command` - Override auto-detected test command (optional)
+- [ ] Auto-detect test framework from project files:
+  - `pom.xml` with JUnit → `mvn test`
+  - `build.gradle` → `./gradlew test`
+  - `package.json` with test script → `npm test`
+  - `pytest.ini` or `setup.py` → `pytest`
 
 ### 7.4 Verification Checklist
 - [ ] Test CLI runs workflow from command line
@@ -396,9 +418,9 @@ src/
 │               ├── agent/
 │               │   ├── AgentConfig.java              # Agent configuration
 │               │   ├── AgentInvoker.java             # Agent invocation
-│               │   └── TestListAgent.java            # Planning agent
-│               │   └── TestAgent.java                # Red phase agent
-│               │   └── ImplementingAgent.java        # Green phase agent
+│               │   ├── TestListAgent.java            # Planning agent
+│               │   ├── TestAgent.java                # Red phase agent
+│               │   ├── ImplementingAgent.java        # Green phase agent
 │               │   └── RefactorAgent.java            # Refactor agent
 │               ├── git/
 │               │   ├── GitNotesManager.java          # Git Notes operations
@@ -509,9 +531,11 @@ src/
 1. **Independent Sessions**: Each agent runs as a fresh session (no shared memory)
 2. **Git as Shared State**: Repository + Git Notes = complete state
 3. **One Test at a Time**: Each cycle processes exactly one test
-4. **Four Commits per Cycle**: Plan → Red → Green → Refactor
-5. **Non-intrusive Handoffs**: Git Notes don't pollute commit history
+4. **Four Commits per Cycle**: Plan → Red → Green → Refactor (agents commit via Bash)
+5. **Non-intrusive Handoffs**: Git Notes don't pollute commit history (orchestrator writes notes)
 6. **Retry with Context**: Failed phases include error info in retry prompts
+7. **Fixed Phase Sequence**: PLAN → RED → GREEN → REFACTOR → (loop or COMPLETE)
+8. **Auto-detect Test Framework**: Discover test command from project structure
 
 ---
 

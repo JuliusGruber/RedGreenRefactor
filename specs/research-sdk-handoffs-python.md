@@ -74,7 +74,7 @@ The SDK allows defining specialized agents programmatically:
 from claude_agent_sdk import ClaudeAgentOptions, AgentDefinition
 
 tdd_options = ClaudeAgentOptions(
-    allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep", "Task"],
+    allowed_tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
     agents={
         "test-list-agent": AgentDefinition(
             description="Planning specialist that creates and maintains the test list",
@@ -82,12 +82,17 @@ tdd_options = ClaudeAgentOptions(
 
 Your responsibilities:
 1. Analyze feature requirements
-2. Create/update the test list file
+2. Create/update the test list file (test-list.md in project root)
 3. Select the next pending test
 4. Determine when the feature is complete
 
-You DO NOT write actual test code—only plan tests.""",
-            tools=["Read", "Write", "Glob", "Grep"],
+You DO NOT write actual test code—only plan tests.
+Commit via Bash with message starting with "plan:".
+
+Output your selected test in a JSON block:
+{"currentTest": {"description": "...", "testFile": "...", "implFile": "..."}, "nextPhase": "RED"}
+Or when complete: {"currentTest": null, "nextPhase": "COMPLETE"}""",
+            tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
             model="opus"
         ),
 
@@ -96,13 +101,13 @@ You DO NOT write actual test code—only plan tests.""",
             prompt="""You are the Test Agent (Red Phase) in a TDD workflow.
 
 Your responsibilities:
-1. Receive ONE test case description
+1. Receive ONE test case description with file paths
 2. Write a failing test for that case
 3. Verify the test fails (all other tests pass)
-4. Commit the failing test
+4. Commit via Bash with message starting with "test:"
 
 Write minimal, focused tests.""",
-            tools=["Read", "Write", "Bash"],
+            tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
             model="opus"
         ),
 
@@ -114,10 +119,10 @@ Your responsibilities:
 1. Read the failing test
 2. Write MINIMUM code to make it pass
 3. Ensure all tests pass
-4. Commit the implementation
+4. Commit via Bash with message starting with "feat:" or "fix:"
 
 Do NOT over-engineer. Write just enough code.""",
-            tools=["Read", "Write", "Edit", "Bash"],
+            tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
             model="opus"
         ),
 
@@ -129,32 +134,32 @@ Your responsibilities:
 1. Review implementation AND test code
 2. Refactor for clarity, maintainability
 3. Ensure all tests still pass
-4. Commit refactored code
+4. Commit via Bash with message starting with "refactor:"
+5. If no refactoring needed: git commit --allow-empty -m "refactor: no changes needed"
 
 May refactor any code in the codebase.""",
-            tools=["Read", "Edit", "Bash", "Grep"],
+            tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
             model="opus"
         )
     }
 )
 ```
 
-### 2.2 Agent Tool Restrictions
+### 2.2 Agent Tool Access
 
-Each agent receives only the tools needed for its phase:
+All agents have access to all tools and self-regulate based on their prompts:
 
-| Agent | Read | Write | Edit | Bash | Glob | Grep | Task |
-|-------|------|-------|------|------|------|------|------|
-| Test List | ✓ | ✓ | | | ✓ | ✓ | |
-| Test | ✓ | ✓ | | ✓ | | | |
-| Implementing | ✓ | ✓ | ✓ | ✓ | | | |
-| Refactor | ✓ | | ✓ | ✓ | | ✓ | |
+| Agent | Read | Write | Edit | Bash | Glob | Grep |
+|-------|------|-------|------|------|------|------|
+| Test List | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Test | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Implementing | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Refactor | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 **Rationale:**
-- **Test List Agent**: Plans only, no code execution
-- **Test Agent**: Writes new files (tests), runs tests to verify failure
-- **Implementing Agent**: Can create new files OR edit existing ones
-- **Refactor Agent**: Edit only (no creating new files), can search for patterns
+- Agents self-regulate based on their system prompts and role definitions
+- Full tool access allows agents to handle edge cases and unexpected situations
+- Simpler implementation without per-agent tool filtering logic
 
 ---
 
@@ -223,7 +228,7 @@ def read_handoff_state(commit: str = "HEAD") -> dict:
         )
         return json.loads(result.stdout)
     except subprocess.CalledProcessError:
-        return {"phase": "PLAN", "cycle": 0}
+        return {"phase": "PLAN", "cycleNumber": 0}
 
 def write_handoff_state(state: dict, commit: str = "HEAD") -> None:
     """Write handoff state to Git Notes"""
@@ -260,7 +265,6 @@ import asyncio
 import json
 import subprocess
 from pathlib import Path
-from datetime import datetime
 from claude_agent_sdk import query, ClaudeAgentOptions, AgentDefinition
 
 TDD_NOTES_REF = "refs/notes/tdd-handoffs"
@@ -286,11 +290,10 @@ class GitNotesManager:
             result = self._run_git("notes", f"--ref={TDD_NOTES_REF}", "show", commit)
             return json.loads(result.stdout)
         except (subprocess.CalledProcessError, json.JSONDecodeError):
-            return {"phase": "PLAN", "cycle": 1, "pending_tests": [], "completed_tests": []}
+            return {"phase": "PLAN", "cycleNumber": 1, "pendingTests": [], "completedTests": []}
 
     def write_handoff(self, state: dict, commit: str = "HEAD") -> None:
         """Write handoff state to Git Notes"""
-        state["timestamp"] = datetime.utcnow().isoformat() + "Z"
         state_json = json.dumps(state, indent=2)
         self._run_git("notes", f"--ref={TDD_NOTES_REF}", "add", "-f", "-m", state_json, commit)
 
@@ -352,10 +355,10 @@ Output the selected test description clearly."""
             ["Read", "Write", "Glob", "Grep"]
         )
 
-        # Commit and update state
-        commit_sha = self.git_notes.commit_changes("plan: update test list")
+        # Agent commits via Bash; get current HEAD for note
+        commit_sha = self.git_notes.get_head_commit()
         state["phase"] = "PLAN"
-        state["next_phase"] = "RED"
+        state["nextPhase"] = "RED"
         self.git_notes.write_handoff(state, commit_sha)
 
         return state
@@ -366,26 +369,27 @@ Output the selected test description clearly."""
 
         prompt = f"""You are the Test Agent (Red Phase).
 
-Current Test: {state.get('current_test', {}).get('description', 'None')}
+Current Test: {state.get('currentTest', {}).get('description', 'None')}
+Test File: {state.get('currentTest', {}).get('testFile', 'None')}
 
 State: {json.dumps(state, indent=2)}
 
 Tasks:
 1. Write a failing test for the current test case
 2. Run tests to verify your new test fails
-3. Commit the failing test"""
+3. Commit via Bash with message starting with "test:\""""
 
         await self.run_agent(
             "test-agent",
             prompt,
-            ["Read", "Write", "Bash"]
+            ["Read", "Write", "Edit", "Bash", "Glob", "Grep"]
         )
 
-        # Commit and update state
-        commit_sha = self.git_notes.commit_changes("test: add failing test")
+        # Agent commits via Bash; get current HEAD for note
+        commit_sha = self.git_notes.get_head_commit()
         state["phase"] = "RED"
-        state["next_phase"] = "GREEN"
-        state["test_result"] = "FAIL"
+        state["nextPhase"] = "GREEN"
+        state["testResult"] = "FAIL"
         self.git_notes.write_handoff(state, commit_sha)
 
         return state
@@ -396,7 +400,8 @@ Tasks:
 
         prompt = f"""You are the Implementing Agent (Green Phase).
 
-Current Test: {state.get('current_test', {})}
+Current Test: {state.get('currentTest', {})}
+Implementation File: {state.get('currentTest', {}).get('implFile', 'None')}
 
 State: {json.dumps(state, indent=2)}
 
@@ -404,19 +409,19 @@ Tasks:
 1. Read the failing test
 2. Write MINIMUM code to make it pass
 3. Run all tests to verify they pass
-4. Commit the implementation"""
+4. Commit via Bash with message starting with "feat:" or "fix:\""""
 
         await self.run_agent(
             "implementing-agent",
             prompt,
-            ["Read", "Write", "Edit", "Bash"]
+            ["Read", "Write", "Edit", "Bash", "Glob", "Grep"]
         )
 
-        # Commit and update state
-        commit_sha = self.git_notes.commit_changes("feat: implement to pass test")
+        # Agent commits via Bash; get current HEAD for note
+        commit_sha = self.git_notes.get_head_commit()
         state["phase"] = "GREEN"
-        state["next_phase"] = "REFACTOR"
-        state["test_result"] = "PASS"
+        state["nextPhase"] = "REFACTOR"
+        state["testResult"] = "PASS"
         self.git_notes.write_handoff(state, commit_sha)
 
         return state
@@ -427,7 +432,7 @@ Tasks:
 
         prompt = f"""You are the Refactor Agent.
 
-Current Test: {state.get('current_test', {})}
+Current Test: {state.get('currentTest', {})}
 
 State: {json.dumps(state, indent=2)}
 
@@ -435,21 +440,22 @@ Tasks:
 1. Review the test and implementation
 2. Refactor for clarity and maintainability
 3. Run tests to ensure they still pass
-4. Commit refactored code"""
+4. Commit via Bash with message starting with "refactor:"
+5. If no refactoring needed: git commit --allow-empty -m "refactor: no changes needed\""""
 
         await self.run_agent(
             "refactor-agent",
             prompt,
-            ["Read", "Edit", "Bash", "Grep"]
+            ["Read", "Write", "Edit", "Bash", "Glob", "Grep"]
         )
 
-        # Commit and update state
-        commit_sha = self.git_notes.commit_changes("refactor: improve code quality")
+        # Agent commits via Bash; get current HEAD for note
+        commit_sha = self.git_notes.get_head_commit()
         state["phase"] = "REFACTOR"
-        state["next_phase"] = "PLAN"
-        if state.get("current_test"):
-            state.setdefault("completed_tests", []).append(
-                state["current_test"].get("description", "")
+        state["nextPhase"] = "PLAN"
+        if state.get("currentTest"):
+            state.setdefault("completedTests", []).append(
+                state["currentTest"].get("description", "")
             )
         self.git_notes.write_handoff(state, commit_sha)
 
@@ -513,41 +519,37 @@ write_handoff() {
 echo "📋 Running Test List Agent..."
 STATE=$(read_handoff)
 claude --print --dangerously-skip-permissions \
-    --prompt "You are the Test List Agent. Create a test list for: $FEATURE. Current state: $STATE" \
+    --prompt "You are the Test List Agent. Create a test list for: $FEATURE. Commit via Bash. State: $STATE" \
     --cwd "$PROJECT_ROOT" \
-    --allowedTools "Read,Write,Glob,Grep"
-git add -A && git commit -m "plan: update test list"
-write_handoff '{"phase":"PLAN","next_phase":"RED"}'
+    --allowedTools "Read,Write,Edit,Bash,Glob,Grep"
+write_handoff '{"phase":"PLAN","nextPhase":"RED"}'
 
 # Phase 2: Test Agent
 echo "🔴 Running Test Agent..."
 STATE=$(read_handoff)
 claude --print --dangerously-skip-permissions \
-    --prompt "You are the Test Agent. Write a failing test. State: $STATE" \
+    --prompt "You are the Test Agent. Write a failing test and commit via Bash. State: $STATE" \
     --cwd "$PROJECT_ROOT" \
-    --allowedTools "Read,Write,Bash"
-git add -A && git commit -m "test: add failing test"
-write_handoff '{"phase":"RED","next_phase":"GREEN","test_result":"FAIL"}'
+    --allowedTools "Read,Write,Edit,Bash,Glob,Grep"
+write_handoff '{"phase":"RED","nextPhase":"GREEN","testResult":"FAIL"}'
 
 # Phase 3: Implementing Agent
 echo "🟢 Running Implementing Agent..."
 STATE=$(read_handoff)
 claude --print --dangerously-skip-permissions \
-    --prompt "You are the Implementing Agent. Make the failing test pass. State: $STATE" \
+    --prompt "You are the Implementing Agent. Make the failing test pass and commit via Bash. State: $STATE" \
     --cwd "$PROJECT_ROOT" \
-    --allowedTools "Read,Write,Edit,Bash"
-git add -A && git commit -m "feat: implement to pass test"
-write_handoff '{"phase":"GREEN","next_phase":"REFACTOR","test_result":"PASS"}'
+    --allowedTools "Read,Write,Edit,Bash,Glob,Grep"
+write_handoff '{"phase":"GREEN","nextPhase":"REFACTOR","testResult":"PASS"}'
 
 # Phase 4: Refactor Agent
 echo "🔵 Running Refactor Agent..."
 STATE=$(read_handoff)
 claude --print --dangerously-skip-permissions \
-    --prompt "You are the Refactor Agent. Refactor the code. State: $STATE" \
+    --prompt "You are the Refactor Agent. Refactor the code and commit via Bash (or --allow-empty if no changes). State: $STATE" \
     --cwd "$PROJECT_ROOT" \
-    --allowedTools "Read,Edit,Bash,Grep"
-git add -A && git commit -m "refactor: improve code quality"
-write_handoff '{"phase":"REFACTOR","next_phase":"PLAN"}'
+    --allowedTools "Read,Write,Edit,Bash,Glob,Grep"
+write_handoff '{"phase":"REFACTOR","nextPhase":"PLAN"}'
 
 echo "✅ TDD cycle complete!"
 ```
