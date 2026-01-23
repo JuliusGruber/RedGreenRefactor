@@ -693,9 +693,6 @@ public class HandoffState {
     @JsonProperty("error")
     private String error;
 
-    @JsonProperty("timestamp")
-    private Instant timestamp;
-
     // Getters, setters, builders...
 }
 
@@ -895,7 +892,6 @@ public class TddOrchestrator {
         HandoffState nextState = currentState.toBuilder()
             .currentPhase(phase)
             .nextPhase(getNextPhase(phase, result))
-            .timestamp(Instant.now())
             .build();
 
         gitNotesManager.writeHandoff(commitId, nextState);

@@ -53,7 +53,6 @@ This document provides a detailed implementation plan for building the multi-age
   - `pendingTests` (List<String>)
   - `testResult` (PASS/FAIL)
   - `error` (nullable)
-  - `timestamp`
 - [ ] Create `TestCase` record:
   - `description`
   - `testFile`
@@ -459,11 +458,6 @@ src/
     <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
-        <version>2.18.2</version>
-    </dependency>
-    <dependency>
-        <groupId>com.fasterxml.jackson.datatype</groupId>
-        <artifactId>jackson-datatype-jsr310</artifactId>
         <version>2.18.2</version>
     </dependency>
 
