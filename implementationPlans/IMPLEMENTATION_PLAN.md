@@ -145,7 +145,7 @@ This document provides a detailed implementation plan for building the multi-age
   - Analyze feature requirements
   - Create/update test list file (`test-list.md` in project root, using markdown checkboxes)
   - Select next pending test
-  - Determine when feature is complete
+  - Determine when feature is complete: all tests in `test-list.md` are marked `[x]`
   - Output JSON with full TestCase and next phase:
     ```json
     {
@@ -534,11 +534,12 @@ src/
 4. **Four Commits per Cycle**: Plan → Red → Green → Refactor (agents commit via Bash)
 5. **Non-intrusive Handoffs**: Git Notes don't pollute commit history (orchestrator writes notes)
 6. **Retry with Context**: Failed phases include error info in retry prompts
-7. **Fixed Phase Sequence**: PLAN → RED → GREEN → REFACTOR → (loop or COMPLETE)
+7. **Fixed Phase Sequence**: PLAN → RED → GREEN → REFACTOR → (loop or COMPLETE). Orchestrator controls transitions; only Test List Agent outputs `nextPhase`
 8. **Auto-detect Test Framework**: Discover test command from project structure (first match wins)
 9. **Model Strategy**: No fallback - if configured model unavailable, abort with clear error
 10. **Git Notes Errors**: Fail fast with recovery guidance - provide CLI command to reset/repair notes
 11. **Bash Timeout**: Single global timeout (default 120s) applies to all commands
+12. **Feature Completion**: Feature is complete when all tests in `test-list.md` are marked `[x]`
 
 ---
 
