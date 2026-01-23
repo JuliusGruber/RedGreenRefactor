@@ -96,7 +96,7 @@ The following table confirms which TDD workflow features are supported by the An
 | **Tool Results** | ✅ Yes | `ToolResultBlockParam` for returning tool execution results |
 | **Streaming** | ✅ Yes | `StreamResponse<RawMessageStreamEvent>` with auto-close |
 | **Async Execution** | ✅ Yes | `CompletableFuture<Message>` via `.async()` |
-| **Model Selection** | ✅ Yes | `Model.CLAUDE_SONNET_4_20250514` enum |
+| **Model Selection** | ✅ Yes | `Model.CLAUDE_OPUS_4_5_20251101` enum |
 | **Conversation History** | ✅ Yes | List of `MessageParam` for multi-turn conversations |
 | **Beta Features** | ✅ Yes | `BetaTool`, `BetaMessage` for experimental features |
 
@@ -265,8 +265,8 @@ public AgentDefinition testListAgent() {
         {"test": "description of the test", "complete": false}
         ```
         """,
-        List.of(createReadTool(), createWriteTool(), createGlobTool(), createGrepTool()),
-        Model.CLAUDE_SONNET_4_20250514
+        getAllTools(),
+        Model.CLAUDE_OPUS_4_5_20251101
     );
 }
 
@@ -284,8 +284,8 @@ public AgentDefinition testAgent() {
 
         Write minimal, focused tests. Commit with message starting with "test:".
         """,
-        List.of(createReadTool(), createWriteTool(), createBashTool()),
-        Model.CLAUDE_SONNET_4_20250514
+        getAllTools(),
+        Model.CLAUDE_OPUS_4_5_20251101
     );
 }
 
@@ -304,8 +304,8 @@ public AgentDefinition implementingAgent() {
         Do NOT over-engineer. Write just enough code.
         Commit with message starting with "feat:" or "fix:".
         """,
-        List.of(createReadTool(), createWriteTool(), createEditTool(), createBashTool()),
-        Model.CLAUDE_SONNET_4_20250514
+        getAllTools(),
+        Model.CLAUDE_OPUS_4_5_20251101
     );
 }
 
@@ -324,26 +324,38 @@ public AgentDefinition refactorAgent() {
         May refactor any code in the codebase.
         Commit with message starting with "refactor:".
         """,
-        List.of(createReadTool(), createEditTool(), createBashTool(), createGrepTool()),
-        Model.CLAUDE_SONNET_4_20250514
+        getAllTools(),
+        Model.CLAUDE_OPUS_4_5_20251101
+    );
+}
+
+private List<Tool> getAllTools() {
+    return List.of(
+        createReadTool(),
+        createWriteTool(),
+        createEditTool(),
+        createBashTool(),
+        createGlobTool(),
+        createGrepTool()
     );
 }
 ```
 
-### 4.3 Tool Restrictions Matrix
+### 4.3 Tool Access
+
+All agents have access to all tools:
 
 | Agent | read_file | write_file | edit_file | bash | glob | grep |
 |-------|-----------|------------|-----------|------|------|------|
-| Test List | ✓ | ✓ | | | ✓ | ✓ |
-| Test | ✓ | ✓ | | ✓ | | |
-| Implementing | ✓ | ✓ | ✓ | ✓ | | |
-| Refactor | ✓ | | ✓ | ✓ | | ✓ |
+| Test List | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Test | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Implementing | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Refactor | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 **Rationale:**
-- **Test List Agent**: Plans only, no code execution
-- **Test Agent**: Writes new files (tests), runs tests to verify failure
-- **Implementing Agent**: Can create new files OR edit existing ones
-- **Refactor Agent**: Edit only (no creating new files), can search for patterns
+- Agents self-regulate based on their system prompts and role definitions
+- Full tool access allows agents to handle edge cases and unexpected situations
+- Simpler implementation without per-agent tool filtering logic
 
 ---
 
@@ -770,7 +782,7 @@ public class TddOrchestrator {
             {"test": "description of the test", "complete": false}
             ```
             """,
-            Model.CLAUDE_SONNET_4_20250514
+            Model.CLAUDE_OPUS_4_5_20251101
         ),
         HandoffState.Phase.RED, new AgentConfig(
             "Test Agent",
@@ -783,7 +795,7 @@ public class TddOrchestrator {
 
             Write minimal, focused tests. Commit with message starting with "test:".
             """,
-            Model.CLAUDE_SONNET_4_20250514
+            Model.CLAUDE_OPUS_4_5_20251101
         ),
         HandoffState.Phase.GREEN, new AgentConfig(
             "Implementing Agent",
@@ -797,7 +809,7 @@ public class TddOrchestrator {
             Do NOT over-engineer. Write just enough code.
             Commit with message starting with "feat:" or "fix:".
             """,
-            Model.CLAUDE_SONNET_4_20250514
+            Model.CLAUDE_OPUS_4_5_20251101
         ),
         HandoffState.Phase.REFACTOR, new AgentConfig(
             "Refactor Agent",
@@ -811,7 +823,7 @@ public class TddOrchestrator {
             May refactor any code in the codebase.
             Commit with message starting with "refactor:".
             """,
-            Model.CLAUDE_SONNET_4_20250514
+            Model.CLAUDE_OPUS_4_5_20251101
         )
     );
 
