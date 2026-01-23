@@ -62,7 +62,7 @@ This document provides a detailed implementation plan for building the multi-age
   - `name`
   - `description`
   - `systemPrompt`
-  - `allowedTools` (List<Tool>)
+  - `tools` (List<Tool>) - all agents have access to all tools
   - `model`
 - [ ] Create `CycleResult` and `WorkflowResult` records
 
@@ -127,27 +127,13 @@ This document provides a detailed implementation plan for building the multi-age
 - [ ] Create `ToolDispatcher` to route tool calls to handlers
 - [ ] Implement timeout handling for bash commands
 
-### 3.3 Tool Restrictions Matrix
-Implement tool access control per agent:
-
-| Agent | read | write | edit | bash | glob | grep |
-|-------|------|-------|------|------|------|------|
-| Test List | ✓ | ✓ | | | ✓ | ✓ |
-| Test | ✓ | ✓ | | ✓ | | |
-| Implementing | ✓ | ✓ | ✓ | ✓ | | |
-| Refactor | ✓ | | ✓ | ✓ | | ✓ |
-
-- [ ] Implement `AgentToolFilter` to enforce restrictions
-- [ ] Test that agents cannot use unauthorized tools
-
-### 3.4 Verification Checklist
+### 3.3 Verification Checklist
 - [ ] Test read_file tool reads file correctly
 - [ ] Test write_file tool creates/overwrites files
 - [ ] Test edit_file tool performs text replacement
 - [ ] Test bash tool executes commands and captures output
 - [ ] Test glob tool finds files matching patterns
 - [ ] Test grep tool finds text patterns
-- [ ] Verify tool restrictions are enforced per agent
 
 ---
 
@@ -160,7 +146,7 @@ Implement tool access control per agent:
   - Select next pending test
   - Determine when feature is complete
   - Output JSON: `{"test": "description", "complete": false}`
-- [ ] Tools: read, write, glob, grep
+- [ ] Tools: all (read, write, edit, bash, glob, grep)
 - [ ] Model: Claude Sonnet
 
 ### 4.2 Test Agent (Red Phase)
@@ -169,7 +155,7 @@ Implement tool access control per agent:
   - Write a failing test for that case
   - Test must compile but FAIL when run
   - Commit with "test:" prefix
-- [ ] Tools: read, write, bash
+- [ ] Tools: all (read, write, edit, bash, glob, grep)
 - [ ] Model: Claude Sonnet
 - [ ] Must verify test fails before completing
 
@@ -179,7 +165,7 @@ Implement tool access control per agent:
   - Write MINIMUM code to make it pass
   - Ensure all tests pass
   - Commit with "feat:" or "fix:" prefix
-- [ ] Tools: read, write, edit, bash
+- [ ] Tools: all (read, write, edit, bash, glob, grep)
 - [ ] Model: Claude Sonnet
 - [ ] Must verify all tests pass before completing
 
@@ -189,14 +175,13 @@ Implement tool access control per agent:
   - Refactor for clarity, maintainability
   - Ensure all tests still pass
   - Commit with "refactor:" prefix
-- [ ] Tools: read, edit, bash, grep
+- [ ] Tools: all (read, write, edit, bash, glob, grep)
 - [ ] Model: Claude Sonnet
 - [ ] Must verify all tests pass after refactoring
 
 ### 4.5 Verification Checklist
 - [ ] Test each agent can be invoked with Anthropic SDK
 - [ ] Verify agents produce valid tool calls
-- [ ] Test agents respect tool restrictions
 - [ ] Verify commit messages follow conventions
 
 ---
