@@ -21,7 +21,6 @@ Four **independent Claude Code sessions** collaborate in a Test-Driven Developme
 - Analyzes requirements and breaks them down
 - **Writes a comprehensive test list** (stored as `test-list.md` in project root, using markdown checkboxes)
 - Marks tests as pending/completed in the list
-- **Decides when the feature is complete**: Feature is complete when all tests in `test-list.md` are marked as done `[x]`
 - **Commits** the test list with message prefix `plan:`
 - **Handoff →** Outputs JSON with next test selection:
   ```json
@@ -30,11 +29,11 @@ Four **independent Claude Code sessions** collaborate in a Test-Driven Developme
       "description": "test description",
       "testFile": "src/test/java/...",
       "implFile": "src/main/java/..."
-    },
-    "nextPhase": "RED"
+    }
   }
   ```
-  Or when complete: `{"currentTest": null, "nextPhase": "COMPLETE"}`
+  Or when all tests are complete: `{"currentTest": null}`
+- The orchestrator determines feature completion by checking if all tests in `test-list.md` are marked `[x]`
 
 ### 2. Test Agent (Red Phase)
 - Receives **one test** from the test list (the next pending test)
@@ -66,9 +65,9 @@ The **orchestrator controls the phase sequence**. The fixed order is:
 PLAN → RED → GREEN → REFACTOR → PLAN (loop) or COMPLETE
 ```
 
-- The orchestrator automatically advances through RED → GREEN → REFACTOR
-- Only the **Test List Agent** decides between continuing (`nextPhase: "RED"`) or finishing (`nextPhase: "COMPLETE"`)
-- Other agents do not need to specify `nextPhase`; the orchestrator handles transitions
+- The orchestrator sets `nextPhase` after each phase completes, following the fixed sequence
+- The orchestrator determines feature completion by checking if all tests in `test-list.md` are marked `[x]`
+- Agents do not need to specify `nextPhase`; the orchestrator handles all transitions
 
 ## The TDD Process Philosophy
 

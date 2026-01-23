@@ -145,20 +145,19 @@ This document provides a detailed implementation plan for building the multi-age
   - Analyze feature requirements
   - Create/update test list file (`test-list.md` in project root, using markdown checkboxes)
   - Select next pending test
-  - Determine when feature is complete: all tests in `test-list.md` are marked `[x]`
-  - Output JSON with full TestCase and next phase:
+  - Output JSON with full TestCase:
     ```json
     {
       "currentTest": {
         "description": "test description",
         "testFile": "src/test/java/...",
         "implFile": "src/main/java/..."
-      },
-      "nextPhase": "RED"
+      }
     }
     ```
-    Or when complete: `{"currentTest": null, "nextPhase": "COMPLETE"}`
+    Or when all tests complete: `{"currentTest": null}`
   - Commit with "plan:" prefix via Bash tool
+  - Orchestrator determines feature completion by checking if all tests in `test-list.md` are marked `[x]`
 - [ ] Tools: all (Read, Write, Edit, Bash, Glob, Grep)
 - [ ] Model: Claude Opus 4.5
 
@@ -246,7 +245,7 @@ This document provides a detailed implementation plan for building the multi-age
   - Run planning phase to get initial test list
   - Loop through TDD cycles until complete
   - Fixed phase sequence: PLAN → RED → GREEN → REFACTOR → PLAN (loop) or COMPLETE
-  - Detect completion when Test List Agent outputs `{"nextPhase": "COMPLETE"}`
+  - Detect completion when Test List Agent outputs `{"currentTest": null}` (orchestrator verifies all tests in `test-list.md` are marked `[x]`)
   - Return `WorkflowResult`
 
 ### 5.6 Verification Checklist
@@ -534,7 +533,7 @@ src/
 4. **Four Commits per Cycle**: Plan → Red → Green → Refactor (agents commit via Bash)
 5. **Non-intrusive Handoffs**: Git Notes don't pollute commit history (orchestrator writes notes)
 6. **Retry with Context**: Failed phases include error info in retry prompts
-7. **Fixed Phase Sequence**: PLAN → RED → GREEN → REFACTOR → (loop or COMPLETE). Orchestrator controls transitions; only Test List Agent outputs `nextPhase`
+7. **Fixed Phase Sequence**: PLAN → RED → GREEN → REFACTOR → (loop or COMPLETE). Orchestrator controls all transitions and sets `nextPhase` after each phase completes
 8. **Auto-detect Test Framework**: Discover test command from project structure (first match wins)
 9. **Model Strategy**: No fallback - if configured model unavailable, abort with clear error
 10. **Git Notes Errors**: Fail fast with recovery guidance - provide CLI command to reset/repair notes
@@ -597,11 +596,12 @@ The Test List Agent must output JSON with the full TestCase structure:
     "description": "test description",
     "testFile": "src/test/java/...",
     "implFile": "src/main/java/..."
-  },
-  "nextPhase": "RED"
+  }
 }
 ```
-When complete: `{"currentTest": null, "nextPhase": "COMPLETE"}`
+When all tests complete: `{"currentTest": null}`
+
+The orchestrator determines feature completion by checking if all tests in `test-list.md` are marked `[x]`.
 
 **Do NOT use** the simplified format `{"test": "...", "complete": false}`.
 
