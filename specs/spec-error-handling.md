@@ -81,7 +81,7 @@ Retries use exponential backoff:
 
 ## Error State in Git Notes
 
-When an error occurs, the orchestrator records it in the handoff note (camelCase):
+When an error occurs, the orchestrator records it in the handoff note using the `refs/notes/tdd-handoffs` namespace (camelCase field names):
 
 ```json
 {
