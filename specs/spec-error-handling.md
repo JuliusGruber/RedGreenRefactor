@@ -89,8 +89,7 @@ When an error occurs, the orchestrator records it in the handoff note:
   "error": "Test still failing after implementation",
   "error_details": {
     "type": "TestFailure",
-    "message": "Expected 200, got 404",
-    "timestamp": "2025-01-11T10:30:00Z"
+    "message": "Expected 200, got 404"
   },
   "retry_count": 2
 }

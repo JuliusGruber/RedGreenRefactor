@@ -1185,8 +1185,7 @@ public void recordError(ObjectId commitId, Exception error, HandoffState state)
         .error(error.getMessage())
         .errorDetails(new ErrorDetails(
             error.getClass().getName(),
-            Arrays.toString(error.getStackTrace()),
-            Instant.now()
+            Arrays.toString(error.getStackTrace())
         ))
         .build();
 
