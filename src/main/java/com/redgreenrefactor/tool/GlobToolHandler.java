@@ -1,7 +1,12 @@
 package com.redgreenrefactor.tool;
 
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.PathMatcher;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,9 +38,7 @@ public class GlobToolHandler implements ToolExecutor {
             return ToolResult.failure("pattern is required");
         }
 
-        Path searchPath = pathStr != null && !pathStr.isBlank()
-                ? Path.of(pathStr)
-                : defaultDirectory;
+        Path searchPath = resolveSearchPath(pathStr);
 
         if (!Files.exists(searchPath)) {
             return ToolResult.failure("Directory not found: " + searchPath);
@@ -88,5 +91,12 @@ public class GlobToolHandler implements ToolExecutor {
         });
 
         return matches;
+    }
+
+    private Path resolveSearchPath(String pathStr) {
+        if (pathStr != null && !pathStr.isBlank()) {
+            return Path.of(pathStr);
+        }
+        return defaultDirectory;
     }
 }
