@@ -3,6 +3,7 @@ package com.redgreenrefactor.model;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * Represents the result of a complete TDD workflow execution.
@@ -57,7 +58,7 @@ public record WorkflowResult(
      * @return Count of cycles where success is false
      */
     public long failedCycleCount() {
-        return cycles.stream().filter(c -> !c.success()).count();
+        return cycles.stream().filter(Predicate.not(CycleResult::success)).count();
     }
 
     /**
@@ -93,7 +94,7 @@ public record WorkflowResult(
         }
 
         public Builder cycles(List<CycleResult> cycles) {
-            this.cycles = cycles;
+            this.cycles = cycles == null ? List.of() : List.copyOf(cycles);
             return this;
         }
 
