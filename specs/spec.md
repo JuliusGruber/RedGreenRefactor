@@ -14,6 +14,8 @@ Four **independent Claude Code sessions** collaborate in a Test-Driven Developme
 
 ## Agent Roles
 
+> **Tool Access**: All agents have access to all tools (Read, Write, Edit, Bash, Glob, Grep). Agents self-regulate based on their system prompts and role definitions. Full tool access allows agents to handle edge cases and unexpected situations.
+
 ### 1. Test List Agent (Planning)
 - Receives a feature request
 - Analyzes requirements and breaks them down

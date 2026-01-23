@@ -90,7 +90,14 @@ You DO NOT write actual test code—only plan tests.
 Commit via Bash with message starting with "plan:".
 
 Output your selected test in a JSON block:
-{"currentTest": {"description": "...", "testFile": "...", "implFile": "..."}, "nextPhase": "RED"}
+{
+  "currentTest": {
+    "description": "test description",
+    "testFile": "src/test/java/...",
+    "implFile": "src/main/java/..."
+  },
+  "nextPhase": "RED"
+}
 Or when complete: {"currentTest": null, "nextPhase": "COMPLETE"}""",
             tools=["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
             model="opus"

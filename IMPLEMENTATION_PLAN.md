@@ -535,7 +535,107 @@ src/
 5. **Non-intrusive Handoffs**: Git Notes don't pollute commit history (orchestrator writes notes)
 6. **Retry with Context**: Failed phases include error info in retry prompts
 7. **Fixed Phase Sequence**: PLAN → RED → GREEN → REFACTOR → (loop or COMPLETE)
-8. **Auto-detect Test Framework**: Discover test command from project structure
+8. **Auto-detect Test Framework**: Discover test command from project structure (first match wins)
+9. **Model Strategy**: No fallback - if configured model unavailable, abort with clear error
+10. **Git Notes Errors**: Fail fast with recovery guidance - provide CLI command to reset/repair notes
+11. **Bash Timeout**: Single global timeout (default 120s) applies to all commands
+
+---
+
+## Detailed Design Decisions
+
+### Data Model Implementation
+
+**HandoffState**: Use Java `record` (immutable) with a manual `toBuilder()` method for creating modified copies:
+```java
+public record HandoffState(
+    Phase phase,
+    Phase nextPhase,
+    int cycleNumber,
+    TestCase currentTest,
+    List<String> completedTests,
+    List<String> pendingTests,
+    String testResult,
+    String error,
+    ErrorDetails errorDetails,
+    int retryCount
+) {
+    public HandoffStateBuilder toBuilder() {
+        return new HandoffStateBuilder(this);
+    }
+}
+```
+
+**AgentConfig**: Use `tools` as the field name (not `allowedTools`):
+```java
+public record AgentConfig(
+    String name,
+    String description,
+    String systemPrompt,
+    List<Tool> tools,
+    Model model
+) {}
+```
+
+### Tool Parameter Names
+
+Edit tool parameters must match Claude's actual interface:
+- `file_path` - absolute path to file
+- `old_string` - text to replace (NOT `old_text`)
+- `new_string` - replacement text (NOT `new_text`)
+
+### Test List Agent Output Format
+
+The Test List Agent must output JSON with the full TestCase structure:
+```json
+{
+  "currentTest": {
+    "description": "test description",
+    "testFile": "src/test/java/...",
+    "implFile": "src/main/java/..."
+  },
+  "nextPhase": "RED"
+}
+```
+When complete: `{"currentTest": null, "nextPhase": "COMPLETE"}`
+
+**Do NOT use** the simplified format `{"test": "...", "complete": false}`.
+
+### Test Framework Auto-Detection
+
+Priority order (first match wins):
+1. `pom.xml` with JUnit → `mvn test`
+2. `build.gradle` or `build.gradle.kts` → `./gradlew test`
+3. `package.json` with test script → `npm test`
+4. `pytest.ini`, `pyproject.toml`, or `setup.py` → `pytest`
+
+If no framework detected and `test.command` not configured, abort with clear error message.
+
+### Model Availability
+
+No fallback chain. If `TDD_MODEL` (default: `claude-opus-4-5-20251101`) is unavailable:
+- Abort immediately with clear error message
+- Do not attempt to use alternative models
+- Rationale: TDD quality depends on consistent model behavior; silent fallback may degrade results
+
+### Git Notes Error Handling
+
+On Git Notes read/write errors:
+- Abort the current operation immediately
+- Log the specific error with context
+- Provide recovery command in error message:
+  ```
+  ERROR: Failed to read Git Notes. Run 'tdd-orchestrator repair-notes' to recover.
+  ```
+- Assume single orchestrator instance (no locking mechanism needed)
+
+### Bash Timeout Configuration
+
+Single global timeout applies to all Bash commands:
+- Configured via `bash.timeout` in `tdd.properties` (default: 120 seconds)
+- No per-command timeout override
+- Test commands use the same timeout as other commands
+- Rationale: Simplicity; test suites exceeding 2 minutes should optimize their tests
 
 ---
 
