@@ -5,13 +5,16 @@ import com.anthropic.core.JsonValue;
 import com.anthropic.models.messages.ContentBlock;
 import com.anthropic.models.messages.Message;
 import com.anthropic.models.messages.MessageCreateParams;
-import com.anthropic.models.messages.MessagesClient;
 import com.anthropic.models.messages.StopReason;
+import com.anthropic.services.blocking.MessageService;
 import com.anthropic.models.messages.TextBlock;
 import com.anthropic.models.messages.ToolUseBlock;
 import com.anthropic.models.messages.Usage;
+import com.anthropic.models.messages.CacheCreation;
+import com.anthropic.models.messages.ServerToolUsage;
 import com.redgreenrefactor.model.AgentConfig;
 import com.redgreenrefactor.tool.ToolDispatcher;
+import com.redgreenrefactor.tool.ToolExecutionException;
 import com.redgreenrefactor.tool.ToolResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,6 +22,7 @@ import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -31,17 +35,17 @@ import static org.mockito.Mockito.when;
 class AgentInvokerTest {
 
     private AnthropicClient mockClient;
-    private MessagesClient mockMessagesClient;
+    private MessageService mockMessageService;
     private ToolDispatcher mockToolDispatcher;
     private AgentInvoker invoker;
 
     @BeforeEach
     void setUp() {
         mockClient = mock(AnthropicClient.class);
-        mockMessagesClient = mock(MessagesClient.class);
+        mockMessageService = mock(MessageService.class);
         mockToolDispatcher = mock(ToolDispatcher.class);
 
-        when(mockClient.messages()).thenReturn(mockMessagesClient);
+        when(mockClient.messages()).thenReturn(mockMessageService);
 
         invoker = new AgentInvoker(mockClient, mockToolDispatcher);
     }
@@ -81,7 +85,7 @@ class AgentInvokerTest {
         AgentConfig config = createTestConfig();
         Message response = createTextResponse("Hello, world!");
 
-        when(mockMessagesClient.create(any(MessageCreateParams.class))).thenReturn(response);
+        when(mockMessageService.create(any(MessageCreateParams.class))).thenReturn(response);
 
         // Execute
         AgentInvoker.AgentResponse result = invoker.invoke(config, "Test prompt");
@@ -93,7 +97,7 @@ class AgentInvokerTest {
     }
 
     @Test
-    void invoke_executesToolAndContinues() {
+    void invoke_executesToolAndContinues() throws ToolExecutionException {
         // Setup
         AgentConfig config = createTestConfig();
 
@@ -104,7 +108,7 @@ class AgentInvokerTest {
         // Second response: text after tool result
         Message textResponse = createTextResponse("File content processed");
 
-        when(mockMessagesClient.create(any(MessageCreateParams.class)))
+        when(mockMessageService.create(any(MessageCreateParams.class)))
                 .thenReturn(toolUseResponse)
                 .thenReturn(textResponse);
 
@@ -121,7 +125,7 @@ class AgentInvokerTest {
     }
 
     @Test
-    void invoke_handlesToolError() {
+    void invoke_handlesToolError() throws ToolExecutionException {
         // Setup
         AgentConfig config = createTestConfig();
 
@@ -129,7 +133,7 @@ class AgentInvokerTest {
                 Map.of("file_path", "/nonexistent.txt"));
         Message textResponse = createTextResponse("File not found, trying another approach");
 
-        when(mockMessagesClient.create(any(MessageCreateParams.class)))
+        when(mockMessageService.create(any(MessageCreateParams.class)))
                 .thenReturn(toolUseResponse)
                 .thenReturn(textResponse);
 
@@ -144,7 +148,7 @@ class AgentInvokerTest {
     }
 
     @Test
-    void invoke_handlesToolException() {
+    void invoke_handlesToolException() throws ToolExecutionException {
         // Setup
         AgentConfig config = createTestConfig();
 
@@ -152,7 +156,7 @@ class AgentInvokerTest {
                 Map.of("command", "invalid"));
         Message textResponse = createTextResponse("Command failed");
 
-        when(mockMessagesClient.create(any(MessageCreateParams.class)))
+        when(mockMessageService.create(any(MessageCreateParams.class)))
                 .thenReturn(toolUseResponse)
                 .thenReturn(textResponse);
 
@@ -177,14 +181,14 @@ class AgentInvokerTest {
                 .build();
 
         Message response = createTextResponse("Done");
-        when(mockMessagesClient.create(any(MessageCreateParams.class))).thenReturn(response);
+        when(mockMessageService.create(any(MessageCreateParams.class))).thenReturn(response);
 
         // Execute
         invoker.invoke(config, "Test");
 
         // Verify
         ArgumentCaptor<MessageCreateParams> captor = ArgumentCaptor.forClass(MessageCreateParams.class);
-        verify(mockMessagesClient).create(captor.capture());
+        verify(mockMessageService).create(captor.capture());
 
         MessageCreateParams params = captor.getValue();
         assertThat(params.model().toString()).isEqualTo("claude-opus-4-5-20251101");
@@ -202,19 +206,16 @@ class AgentInvokerTest {
     private Message createTextResponse(String text) {
         TextBlock textBlock = TextBlock.builder()
                 .text(text)
+                .citations(List.of())
                 .build();
 
         return Message.builder()
                 .id("msg-123")
-                .type(Message.Type.MESSAGE)
-                .role(Message.Role.ASSISTANT)
                 .content(List.of(ContentBlock.ofText(textBlock)))
                 .model("claude-opus-4-5-20251101")
                 .stopReason(StopReason.END_TURN)
-                .usage(Usage.builder()
-                        .inputTokens(10L)
-                        .outputTokens(20L)
-                        .build())
+                .stopSequence(Optional.empty())
+                .usage(createTestUsage())
                 .build();
     }
 
@@ -227,15 +228,28 @@ class AgentInvokerTest {
 
         return Message.builder()
                 .id("msg-123")
-                .type(Message.Type.MESSAGE)
-                .role(Message.Role.ASSISTANT)
                 .content(List.of(ContentBlock.ofToolUse(toolUseBlock)))
                 .model("claude-opus-4-5-20251101")
                 .stopReason(StopReason.TOOL_USE)
-                .usage(Usage.builder()
-                        .inputTokens(10L)
-                        .outputTokens(20L)
+                .stopSequence(Optional.empty())
+                .usage(createTestUsage())
+                .build();
+    }
+
+    private Usage createTestUsage() {
+        return Usage.builder()
+                .inputTokens(10L)
+                .outputTokens(20L)
+                .cacheCreationInputTokens(0L)
+                .cacheReadInputTokens(0L)
+                .cacheCreation(CacheCreation.builder()
+                        .ephemeral1hInputTokens(0L)
+                        .ephemeral5mInputTokens(0L)
                         .build())
+                .serverToolUse(ServerToolUsage.builder()
+                        .webSearchRequests(0L)
+                        .build())
+                .serviceTier(Usage.ServiceTier.STANDARD)
                 .build();
     }
 }

@@ -11,6 +11,7 @@ import com.anthropic.models.messages.StopReason;
 import com.anthropic.models.messages.TextBlock;
 import com.anthropic.models.messages.TextBlockParam;
 import com.anthropic.models.messages.ToolResultBlockParam;
+import com.anthropic.models.messages.ToolUnion;
 import com.anthropic.models.messages.ToolUseBlock;
 import com.redgreenrefactor.model.AgentConfig;
 import com.redgreenrefactor.tool.ToolDispatcher;
@@ -93,28 +94,29 @@ public class AgentInvoker {
             // Add the assistant's response to the conversation history
             conversationHistory.add(MessageParam.builder()
                     .role(MessageParam.Role.ASSISTANT)
-                    .content(convertContentBlocksToParams(response.content()))
+                    .content(MessageParam.Content.ofBlockParams(convertContentBlocksToParams(response.content())))
                     .build());
 
             // Check if we're done
-            if (response.stopReason().equals(StopReason.END_TURN)) {
+            StopReason stopReason = response.stopReason().orElse(null);
+            if (StopReason.END_TURN.equals(stopReason)) {
                 String finalText = extractTextContent(response.content());
                 LOG.info("Agent {} completed after {} iterations", config.name(), iteration);
                 return new AgentResponse(finalText, iteration, conversationHistory);
             }
 
             // Handle tool use
-            if (response.stopReason().equals(StopReason.TOOL_USE)) {
+            if (StopReason.TOOL_USE.equals(stopReason)) {
                 List<ContentBlockParam> toolResults = executeToolCalls(response.content());
                 if (!toolResults.isEmpty()) {
                     conversationHistory.add(MessageParam.builder()
                             .role(MessageParam.Role.USER)
-                            .content(toolResults)
+                            .content(MessageParam.Content.ofBlockParams(toolResults))
                             .build());
                 }
             } else {
                 // Unexpected stop reason
-                LOG.warn("Agent {} stopped with unexpected reason: {}", config.name(), response.stopReason());
+                LOG.warn("Agent {} stopped with unexpected reason: {}", config.name(), stopReason);
                 String finalText = extractTextContent(response.content());
                 return new AgentResponse(finalText, iteration, conversationHistory);
             }
@@ -133,7 +135,10 @@ public class AgentInvoker {
 
         // Add tools if configured
         if (!config.tools().isEmpty()) {
-            builder.tools(config.tools());
+            List<ToolUnion> toolUnions = config.tools().stream()
+                    .map(ToolUnion::ofTool)
+                    .toList();
+            builder.tools(toolUnions);
         }
 
         return builder.build();
@@ -143,12 +148,11 @@ public class AgentInvoker {
         List<ContentBlockParam> results = new ArrayList<>();
 
         for (ContentBlock block : contentBlocks) {
-            if (block.isToolUse()) {
-                ToolUseBlock toolUse = block.toolUse();
+            block.toolUse().ifPresent(toolUse -> {
                 LOG.debug("Executing tool: {} with id: {}", toolUse.name(), toolUse.id());
 
                 try {
-                    Map<String, Object> inputs = convertJsonValueToMap(toolUse.input());
+                    Map<String, Object> inputs = convertJsonValueToMap(toolUse._input());
                     ToolResult result = toolDispatcher.dispatch(toolUse.name(), inputs);
                     boolean isError = !result.success();
                     results.add(ContentBlockParam.ofToolResult(
@@ -167,7 +171,7 @@ public class AgentInvoker {
                                     .isError(true)
                                     .build()));
                 }
-            }
+            });
         }
 
         return results;
@@ -197,14 +201,14 @@ public class AgentInvoker {
             }
 
             @Override
-            public Map<String, Object> visitArray(List<JsonValue> values) {
+            public Map<String, Object> visitArray(List<? extends JsonValue> values) {
                 return new HashMap<>();
             }
 
             @Override
-            public Map<String, Object> visitObject(Map<String, JsonValue> values) {
+            public Map<String, Object> visitObject(Map<String, ? extends JsonValue> values) {
                 Map<String, Object> result = new HashMap<>();
-                for (Map.Entry<String, JsonValue> entry : values.entrySet()) {
+                for (Map.Entry<String, ? extends JsonValue> entry : values.entrySet()) {
                     result.put(entry.getKey(), convertJsonValueToObject(entry.getValue()));
                 }
                 return result;
@@ -235,7 +239,7 @@ public class AgentInvoker {
             }
 
             @Override
-            public Object visitArray(List<JsonValue> values) {
+            public Object visitArray(List<? extends JsonValue> values) {
                 List<Object> result = new ArrayList<>();
                 for (JsonValue v : values) {
                     result.add(convertJsonValueToObject(v));
@@ -244,9 +248,9 @@ public class AgentInvoker {
             }
 
             @Override
-            public Object visitObject(Map<String, JsonValue> values) {
+            public Object visitObject(Map<String, ? extends JsonValue> values) {
                 Map<String, Object> result = new HashMap<>();
-                for (Map.Entry<String, JsonValue> entry : values.entrySet()) {
+                for (Map.Entry<String, ? extends JsonValue> entry : values.entrySet()) {
                     result.put(entry.getKey(), convertJsonValueToObject(entry.getValue()));
                 }
                 return result;
@@ -257,13 +261,12 @@ public class AgentInvoker {
     private String extractTextContent(List<ContentBlock> contentBlocks) {
         StringBuilder text = new StringBuilder();
         for (ContentBlock block : contentBlocks) {
-            if (block.isText()) {
-                TextBlock textBlock = block.text();
+            block.text().ifPresent(textBlock -> {
                 if (text.length() > 0) {
                     text.append("\n");
                 }
                 text.append(textBlock.text());
-            }
+            });
         }
         return text.toString();
     }
@@ -271,20 +274,18 @@ public class AgentInvoker {
     private List<ContentBlockParam> convertContentBlocksToParams(List<ContentBlock> blocks) {
         List<ContentBlockParam> params = new ArrayList<>();
         for (ContentBlock block : blocks) {
-            if (block.isText()) {
+            block.text().ifPresent(textBlock ->
                 params.add(ContentBlockParam.ofText(
                         TextBlockParam.builder()
-                                .text(block.text().text())
-                                .build()));
-            } else if (block.isToolUse()) {
-                ToolUseBlock toolUse = block.toolUse();
+                                .text(textBlock.text())
+                                .build())));
+            block.toolUse().ifPresent(toolUse ->
                 params.add(ContentBlockParam.ofToolUse(
                         com.anthropic.models.messages.ToolUseBlockParam.builder()
                                 .id(toolUse.id())
                                 .name(toolUse.name())
-                                .input(toolUse.input())
-                                .build()));
-            }
+                                .input(toolUse._input())
+                                .build())));
         }
         return params;
     }
