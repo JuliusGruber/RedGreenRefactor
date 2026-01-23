@@ -42,6 +42,12 @@ Since each agent runs as an independent Claude Code session (no shared memory), 
 - ~~What exact information is passed from Implementing Agent to Refactor Agent?~~ → `currentTest.implFile` + `testResult`
 - ~~What exact information is passed from Refactor Agent back to Test List Agent?~~ → `completedTests` updated, `nextPhase: PLAN`
 
+### Phase Transition Control *(Resolved)*
+
+- ~~Who controls phase transitions?~~ → **Orchestrator** controls the fixed sequence (PLAN → RED → GREEN → REFACTOR → loop)
+- Only Test List Agent outputs `nextPhase` (either `"RED"` to continue or `"COMPLETE"` to finish)
+- Other agents do not specify `nextPhase`; orchestrator advances automatically
+
 ### Git as Shared State *(Resolved: See "Chosen Approach")*
 
 - ~~Is git the only shared state mechanism?~~ → Yes: Git commits + Git Notes
@@ -152,7 +158,8 @@ The next agent in the TDD workflow consumes two primary data sources:
 ```
 
 **Field types:**
-- `phase`, `nextPhase`: enum (PLAN, RED, GREEN, REFACTOR, COMPLETE)
+- `phase`: enum (PLAN, RED, GREEN, REFACTOR, COMPLETE) - current phase, set by orchestrator
+- `nextPhase`: enum (RED, COMPLETE) - only set by Test List Agent; orchestrator controls other transitions
 - `testResult`: enum (PASS, FAIL) or null
 
 ---

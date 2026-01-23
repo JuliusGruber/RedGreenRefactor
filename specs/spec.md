@@ -21,7 +21,7 @@ Four **independent Claude Code sessions** collaborate in a Test-Driven Developme
 - Analyzes requirements and breaks them down
 - **Writes a comprehensive test list** (stored as `test-list.md` in project root, using markdown checkboxes)
 - Marks tests as pending/completed in the list
-- **Decides when the feature is complete** (not just "no more tests")
+- **Decides when the feature is complete**: Feature is complete when all tests in `test-list.md` are marked as done `[x]`
 - **Commits** the test list with message prefix `plan:`
 - **Handoff →** Outputs JSON with next test selection:
   ```json
@@ -57,6 +57,18 @@ Four **independent Claude Code sessions** collaborate in a Test-Driven Developme
 - Improves code quality, readability, and maintainability
 - **Commits** the refactored code with message prefix `refactor:` (or empty commit with `git commit --allow-empty -m "refactor: no changes needed"`)
 - **Handoff →** Test List Agent (to get the next test from the list)
+
+## Phase Transitions
+
+The **orchestrator controls the phase sequence**. The fixed order is:
+
+```
+PLAN → RED → GREEN → REFACTOR → PLAN (loop) or COMPLETE
+```
+
+- The orchestrator automatically advances through RED → GREEN → REFACTOR
+- Only the **Test List Agent** decides between continuing (`nextPhase: "RED"`) or finishing (`nextPhase: "COMPLETE"`)
+- Other agents do not need to specify `nextPhase`; the orchestrator handles transitions
 
 ## The TDD Process Philosophy
 
@@ -323,6 +335,44 @@ This ensures:
 - **Quality Assurance**: Tests written before implementation
 - **Clean Code**: Dedicated refactoring phase ensures maintainability
 - **Traceability**: Clear handoffs between phases
+
+## Command-Line Interface
+
+The orchestrator provides the following CLI commands:
+
+| Command | Description |
+|---------|-------------|
+| `run <feature-request>` | Run full TDD workflow for a feature |
+| `resume` | Resume from last handoff state |
+| `status` | Show current workflow state |
+| `history` | Show handoff history |
+| `rollback <commit>` | Rollback to specific state |
+
+## Configuration
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ANTHROPIC_API_KEY` | API key (required) | — |
+| `TDD_PROJECT_ROOT` | Project directory | Current directory |
+| `TDD_MAX_RETRIES` | Retry limit per phase | 3 |
+| `TDD_MODEL` | Claude model to use | `claude-opus-4-5-20251101` |
+
+### Config File
+
+Optional `tdd.properties` file in project root (standard Java properties format):
+
+| Property | Description | Default |
+|----------|-------------|---------|
+| `bash.timeout` | Bash command timeout in seconds | 120 |
+| `test.command` | Override auto-detected test command | (auto-detect) |
+
+## Model Configuration
+
+- **Default model**: `claude-opus-4-5-20251101` (Claude Opus 4.5)
+- **No fallback strategy**: If the configured model is unavailable, the orchestrator aborts with a clear error message rather than silently falling back to a different model
+- **Rationale**: TDD quality depends on consistent model behavior; silent fallback may degrade results
 
 ## Implementation Decision: Java SDK
 
