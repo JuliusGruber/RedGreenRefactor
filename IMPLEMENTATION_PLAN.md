@@ -281,8 +281,7 @@ This document provides a detailed implementation plan for building the multi-age
     "error": "message",
     "error_details": {
       "type": "TestFailure",
-      "message": "Expected 200, got 404",
-      "timestamp": "..."
+      "message": "Expected 200, got 404"
     },
     "retry_count": 2
   }
