@@ -145,8 +145,7 @@ The next agent in the TDD workflow consumes two primary data sources:
   "completed_tests": ["User model exists with email"],
   "pending_tests": ["User can log out", "Invalid creds return error"],
   "test_result": "PASS",
-  "error": null,
-  "timestamp": "2025-01-11T10:30:00Z"
+  "error": null
 }
 ```
 
