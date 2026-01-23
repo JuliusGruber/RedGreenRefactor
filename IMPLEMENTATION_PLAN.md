@@ -326,7 +326,7 @@ This document provides a detailed implementation plan for building the multi-age
   - `TDD_PROJECT_ROOT` - project directory (default: current)
   - `TDD_MAX_RETRIES` - retry limit (default: 3)
   - `TDD_MODEL` - model to use (default: claude-opus-4-5-20251101)
-- [ ] Support config file `.tdd-config.json`
+- [ ] Support config file `tdd.properties` (standard Java properties format)
 
 ### 7.4 Verification Checklist
 - [ ] Test CLI runs workflow from command line
