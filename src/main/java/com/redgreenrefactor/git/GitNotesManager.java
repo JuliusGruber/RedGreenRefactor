@@ -98,21 +98,16 @@ public class GitNotesManager implements AutoCloseable {
             RevCommit revCommit = getRevCommit(commitId);
 
             // Remove existing note if present (JGit doesn't support force overwrite)
-            try {
-                Note existing = git.notesShow()
+            Note existing = git.notesShow()
+                    .setNotesRef(NOTES_REF)
+                    .setObjectId(revCommit)
+                    .call();
+            if (existing != null) {
+                git.notesRemove()
                         .setNotesRef(NOTES_REF)
                         .setObjectId(revCommit)
                         .call();
-                if (existing != null) {
-                    git.notesRemove()
-                            .setNotesRef(NOTES_REF)
-                            .setObjectId(revCommit)
-                            .call();
-                    logger.debug("Removed existing note from commit {}", commitId.abbreviate(7).name());
-                }
-            } catch (GitAPIException e) {
-                // Ignore errors when checking/removing - note might not exist
-                logger.debug("No existing note to remove for commit {}", commitId.abbreviate(7).name());
+                logger.debug("Removed existing note from commit {}", commitId.abbreviate(7).name());
             }
 
             // Add the new note
@@ -259,10 +254,11 @@ public class GitNotesManager implements AutoCloseable {
         Objects.requireNonNull(commitId, "commitId must not be null");
 
         try {
-            // Check if note exists first
+            RevCommit revCommit = getRevCommit(commitId);
+
             Note existing = git.notesShow()
                     .setNotesRef(NOTES_REF)
-                    .setObjectId(getRevCommit(commitId))
+                    .setObjectId(revCommit)
                     .call();
 
             if (existing == null) {
@@ -271,7 +267,7 @@ public class GitNotesManager implements AutoCloseable {
 
             git.notesRemove()
                     .setNotesRef(NOTES_REF)
-                    .setObjectId(getRevCommit(commitId))
+                    .setObjectId(revCommit)
                     .call();
 
             logger.info("Removed handoff note from commit {}", commitId.abbreviate(7).name());
