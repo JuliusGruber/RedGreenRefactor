@@ -19,24 +19,35 @@ Four **independent Claude Code sessions** collaborate in a Test-Driven Developme
 ### 1. Test List Agent (Planning)
 - Receives a feature request
 - Analyzes requirements and breaks them down
-- **Writes a comprehensive test list** (stored as a file or document)
+- **Writes a comprehensive test list** (stored as `test-list.md` in project root, using markdown checkboxes)
 - Marks tests as pending/completed in the list
 - **Decides when the feature is complete** (not just "no more tests")
-- **Commits** the test list
-- **Handoff →** Passes the **next pending test** to the Test Agent, or signals completion
+- **Commits** the test list with message prefix `plan:`
+- **Handoff →** Outputs JSON with next test selection:
+  ```json
+  {
+    "currentTest": {
+      "description": "test description",
+      "testFile": "src/test/java/...",
+      "implFile": "src/main/java/..."
+    },
+    "nextPhase": "RED"
+  }
+  ```
+  Or when complete: `{"currentTest": null, "nextPhase": "COMPLETE"}`
 
 ### 2. Test Agent (Red Phase)
 - Receives **one test** from the test list (the next pending test)
 - Writes a failing test for that **single test case**
 - Ensures the test is focused and well-structured
-- **Commits** the failing test
+- **Commits** the failing test with message prefix `test:`
 - **Handoff →** Implementing Agent
 
 ### 3. Implementing Agent (Green Phase)
 - Receives the single failing test
 - Writes minimum code to make **that test** pass
 - Focuses on functionality, not perfection
-- **Commits** the passing implementation
+- **Commits** the passing implementation with message prefix `feat:` or `fix:`
 - **Handoff →** Refactor Agent
 
 ### 4. Refactor Agent (Refactor Phase)
@@ -44,7 +55,7 @@ Four **independent Claude Code sessions** collaborate in a Test-Driven Developme
 - Refactors **both test and implementation code** while keeping tests green
 - May refactor any code in the codebase, not just the current cycle's changes
 - Improves code quality, readability, and maintainability
-- **Commits** the refactored code (or empty commit if no refactoring needed)
+- **Commits** the refactored code with message prefix `refactor:` (or empty commit with `git commit --allow-empty -m "refactor: no changes needed"`)
 - **Handoff →** Test List Agent (to get the next test from the list)
 
 ## The TDD Process Philosophy
@@ -248,9 +259,22 @@ The following diagram shows how the Test List Agent writes a test list and passe
     ╚═══════════════════════════════════════════════════════════════════╝
 ```
 
+## Test Framework Auto-Detection
+
+The orchestrator automatically detects the test framework from project files (first match wins):
+
+| Project File | Test Command |
+|--------------|--------------|
+| `pom.xml` with JUnit | `mvn test` |
+| `build.gradle` or `build.gradle.kts` | `./gradlew test` |
+| `package.json` with test script | `npm test` |
+| `pytest.ini`, `pyproject.toml`, or `setup.py` | `pytest` |
+
+If no framework is detected, the orchestrator aborts with a clear error message.
+
 ## Test List Format
 
-The Test List Agent writes and maintains a test list file. Each test in the list has a status:
+The Test List Agent writes and maintains `test-list.md` in the project root. Each test in the list has a status:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐

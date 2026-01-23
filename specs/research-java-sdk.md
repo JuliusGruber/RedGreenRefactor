@@ -132,21 +132,21 @@ Unlike the Python Claude Agent SDK, the following require custom code:
     <dependency>
         <groupId>org.eclipse.jgit</groupId>
         <artifactId>org.eclipse.jgit</artifactId>
-        <version>6.10.0.202406032230-r</version>
+        <version>7.5.0.202512021534-r</version>
     </dependency>
 
     <!-- Jackson for JSON -->
     <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
-        <version>2.18.2</version>
+        <version>2.21.0</version>
     </dependency>
 
     <!-- SLF4J for logging -->
     <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-simple</artifactId>
-        <version>2.0.9</version>
+        <version>2.0.17</version>
     </dependency>
 </dependencies>
 ```
@@ -167,9 +167,9 @@ java {
 
 dependencies {
     implementation("com.anthropic:anthropic-java:2.11.1")
-    implementation("org.eclipse.jgit:org.eclipse.jgit:6.10.0.202406032230-r")
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
-    implementation("org.slf4j:slf4j-simple:2.0.9")
+    implementation("org.eclipse.jgit:org.eclipse.jgit:7.5.0.202512021534-r")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.21.0")
+    implementation("org.slf4j:slf4j-simple:2.0.17")
 }
 
 application {
@@ -546,14 +546,16 @@ Git Notes attach metadata to commits without modifying them:
 
 ### 6.3 Namespaces for TDD Workflow
 
-**Recommended Namespaces:**
+**Namespaces:**
 
-| Namespace | Purpose |
-|-----------|---------|
-| `refs/notes/tdd-handoffs` | Primary handoff state between agents |
-| `refs/notes/tdd-test-list` | Test list state and progress |
-| `refs/notes/tdd-errors` | Error tracking and recovery info |
-| `refs/notes/tdd-metrics` | Timing and performance data |
+| Namespace | Purpose | Scope |
+|-----------|---------|-------|
+| `refs/notes/tdd-handoffs` | Primary handoff state between agents | **Initial implementation** |
+| `refs/notes/tdd-test-list` | Test list state and progress | Future enhancement |
+| `refs/notes/tdd-errors` | Error tracking and recovery info | Future enhancement |
+| `refs/notes/tdd-metrics` | Timing and performance data | Future enhancement |
+
+> **Note:** Initial implementation uses only `refs/notes/tdd-handoffs`. Additional namespaces are reserved for future enhancements.
 
 ```bash
 # Create handoff note in TDD namespace
@@ -679,13 +681,17 @@ public class HandoffState {
         PLAN, RED, GREEN, REFACTOR, COMPLETE
     }
 
+    public enum TestResult {
+        PASS, FAIL
+    }
+
     private Phase phase;
     private Phase nextPhase;
     private int cycleNumber;
     private TestCase currentTest;
     private List<String> completedTests;
     private List<String> pendingTests;
-    private String testResult;
+    private TestResult testResult;  // enum: PASS, FAIL (nullable)
     private String error;
     private ErrorDetails errorDetails;
     private int retryCount;
@@ -1152,7 +1158,7 @@ public class TDDErrorHandler {
     }
 
     public boolean isUnexpectedPass(String bashOutput, String phase) {
-        if ("red".equals(phase)) {
+        if ("RED".equals(phase)) {
             return bashOutput.contains("OK") ||
                    bashOutput.contains("passed") ||
                    bashOutput.matches(".*Exit code: 0.*");
@@ -1304,12 +1310,14 @@ public void recordError(ObjectId commitId, Exception error, HandoffState state, 
 
 ## 14. Open Questions for Implementation
 
-1. **Spring AI Integration**: Should we use Spring AI's AnthropicChatModel for better DI support?
-2. **Parallel cycles**: Can multiple TDD cycles run in parallel using CompletableFuture?
-3. **Human approval gates**: Should there be optional pause points for human review?
-4. **Rollback granularity**: Should rollback be to last commit or last known-good state?
-5. **Test framework detection**: Should orchestrator auto-detect JUnit/TestNG/etc.?
-6. **Tool execution sandboxing**: How to safely execute bash commands?
+| Question | Status | Resolution |
+|----------|--------|------------|
+| **Spring AI Integration** | Deferred | Not in initial scope; can be added later |
+| **Parallel cycles** | Deferred | Single-threaded workflow for initial implementation |
+| **Human approval gates** | Resolved | No human intervention; abort after 3 retries |
+| **Rollback granularity** | Resolved | Rollback to last known-good commit (identified via Git Notes) |
+| **Test framework detection** | Resolved | Auto-detect from project files (see IMPLEMENTATION_PLAN.md) |
+| **Tool execution sandboxing** | Deferred | Use ProcessBuilder with timeout; sandboxing for future |
 
 ---
 

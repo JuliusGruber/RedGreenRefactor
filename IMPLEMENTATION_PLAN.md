@@ -51,7 +51,7 @@ This document provides a detailed implementation plan for building the multi-age
   - `currentTest` (TestCase)
   - `completedTests` (List<String>)
   - `pendingTests` (List<String>)
-  - `testResult` (PASS/FAIL)
+  - `testResult` (enum: PASS, FAIL, nullable)
   - `error` (nullable String)
   - `errorDetails` (nullable object with `type` and `message`)
   - `retryCount` (int, default 0)
@@ -344,9 +344,9 @@ This document provides a detailed implementation plan for building the multi-age
   - `test.command` - Override auto-detected test command (optional)
 - [ ] Auto-detect test framework from project files:
   - `pom.xml` with JUnit → `mvn test`
-  - `build.gradle` → `./gradlew test`
+  - `build.gradle` or `build.gradle.kts` → `./gradlew test`
   - `package.json` with test script → `npm test`
-  - `pytest.ini` or `setup.py` → `pytest`
+  - `pytest.ini`, `pyproject.toml`, or `setup.py` → `pytest`
 
 ### 7.4 Verification Checklist
 - [ ] Test CLI runs workflow from command line
@@ -506,7 +506,7 @@ src/
     <dependency>
         <groupId>org.junit.jupiter</groupId>
         <artifactId>junit-jupiter</artifactId>
-        <version>6.0.2</version>
+        <version>5.11.4</version>
         <scope>test</scope>
     </dependency>
     <dependency>
@@ -555,11 +555,14 @@ public record HandoffState(
     TestCase currentTest,
     List<String> completedTests,
     List<String> pendingTests,
-    String testResult,
+    TestResult testResult,  // enum, nullable
     String error,
     ErrorDetails errorDetails,
     int retryCount
 ) {
+    public enum Phase { PLAN, RED, GREEN, REFACTOR, COMPLETE }
+    public enum TestResult { PASS, FAIL }
+
     public HandoffStateBuilder toBuilder() {
         return new HandoffStateBuilder(this);
     }

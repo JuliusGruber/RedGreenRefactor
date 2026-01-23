@@ -139,8 +139,8 @@ The next agent in the TDD workflow consumes two primary data sources:
   "cycleNumber": 1,
   "currentTest": {
     "description": "User can log in with valid credentials",
-    "testFile": "tests/test_user_login.py",
-    "implFile": "src/auth/login.py"
+    "testFile": "src/test/java/com/example/auth/UserLoginTest.java",
+    "implFile": "src/main/java/com/example/auth/Login.java"
   },
   "completedTests": ["User model exists with email"],
   "pendingTests": ["User can log out", "Invalid creds return error"],
@@ -150,6 +150,10 @@ The next agent in the TDD workflow consumes two primary data sources:
   "retryCount": 0
 }
 ```
+
+**Field types:**
+- `phase`, `nextPhase`: enum (PLAN, RED, GREEN, REFACTOR, COMPLETE)
+- `testResult`: enum (PASS, FAIL) or null
 
 ---
 
