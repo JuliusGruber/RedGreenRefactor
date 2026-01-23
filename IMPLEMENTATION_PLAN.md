@@ -146,6 +146,7 @@ This document provides a detailed implementation plan for building the multi-age
   - Select next pending test
   - Determine when feature is complete
   - Output JSON: `{"test": "description", "complete": false}`
+  - Commit with "plan:" prefix
 - [ ] Tools: all (read, write, edit, bash, glob, grep)
 - [ ] Model: Claude Opus 4.5
 

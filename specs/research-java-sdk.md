@@ -259,6 +259,7 @@ public AgentDefinition testListAgent() {
         4. Determine when the feature is complete
 
         You DO NOT write actual test code—only plan tests.
+        Commit with message starting with "plan:".
 
         Output your selected test in a JSON block:
         ```json
@@ -776,6 +777,7 @@ public class TddOrchestrator {
             4. Determine when the feature is complete
 
             You DO NOT write actual test code—only plan tests.
+            Commit with message starting with "plan:".
 
             Output your selected test in a JSON block:
             ```json
