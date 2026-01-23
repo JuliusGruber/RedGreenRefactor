@@ -37,10 +37,10 @@ Since each agent runs as an independent Claude Code session (no shared memory), 
 
 ### Handoff Data Structure *(Resolved: See "Handoff State Structure")*
 
-- ~~What exact information is passed from Test List Agent to Test Agent?~~ → `current_test` in Git Notes
-- ~~What exact information is passed from Test Agent to Implementing Agent?~~ → `current_test.test_file` + `test_result`
-- ~~What exact information is passed from Implementing Agent to Refactor Agent?~~ → `current_test.impl_file` + `test_result`
-- ~~What exact information is passed from Refactor Agent back to Test List Agent?~~ → `completed_tests` updated, `next_phase: PLAN`
+- ~~What exact information is passed from Test List Agent to Test Agent?~~ → `currentTest` in Git Notes
+- ~~What exact information is passed from Test Agent to Implementing Agent?~~ → `currentTest.testFile` + `testResult`
+- ~~What exact information is passed from Implementing Agent to Refactor Agent?~~ → `currentTest.implFile` + `testResult`
+- ~~What exact information is passed from Refactor Agent back to Test List Agent?~~ → `completedTests` updated, `nextPhase: PLAN`
 
 ### Git as Shared State *(Resolved: See "Chosen Approach")*
 
@@ -135,17 +135,19 @@ The next agent in the TDD workflow consumes two primary data sources:
 ```json
 {
   "phase": "GREEN",
-  "next_phase": "REFACTOR",
-  "cycle": 1,
-  "current_test": {
+  "nextPhase": "REFACTOR",
+  "cycleNumber": 1,
+  "currentTest": {
     "description": "User can log in with valid credentials",
-    "test_file": "tests/test_user_login.py",
-    "impl_file": "src/auth/login.py"
+    "testFile": "tests/test_user_login.py",
+    "implFile": "src/auth/login.py"
   },
-  "completed_tests": ["User model exists with email"],
-  "pending_tests": ["User can log out", "Invalid creds return error"],
-  "test_result": "PASS",
-  "error": null
+  "completedTests": ["User model exists with email"],
+  "pendingTests": ["User can log out", "Invalid creds return error"],
+  "testResult": "PASS",
+  "error": null,
+  "errorDetails": null,
+  "retryCount": 0
 }
 ```
 
