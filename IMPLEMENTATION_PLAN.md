@@ -157,7 +157,10 @@ This document provides a detailed implementation plan for building the multi-age
   - Commit with "test:" prefix
 - [ ] Tools: all (read, write, edit, bash, glob, grep)
 - [ ] Model: Claude Opus 4.5
-- [ ] Must verify test fails before completing
+- [ ] Test execution verification:
+  - Run ALL tests (not just the new one)
+  - Verify the new test FAILS
+  - Verify all OTHER existing tests still PASS
 
 ### 4.3 Implementing Agent (Green Phase)
 - [ ] Define system prompt:
