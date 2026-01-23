@@ -929,7 +929,7 @@ import com.anthropic.helpers.MessageAccumulator;
 
 public Message invokeWithStreaming(String taskPrompt, Consumer<String> onToken) {
     MessageCreateParams params = MessageCreateParams.builder()
-        .model(Model.CLAUDE_SONNET_4_20250514)
+        .model(Model.CLAUDE_OPUS_4_5_20251101)
         .maxTokens(4096L)
         .system(systemPrompt)
         .addUserMessage(taskPrompt)
@@ -967,7 +967,7 @@ public class AsyncTddOrchestrator {
 
     public CompletableFuture<Message> invokeAgentAsync(String systemPrompt, String task) {
         MessageCreateParams params = MessageCreateParams.builder()
-            .model(Model.CLAUDE_SONNET_4_20250514)
+            .model(Model.CLAUDE_OPUS_4_5_20251101)
             .maxTokens(4096L)
             .system(systemPrompt)
             .addUserMessage(task)
