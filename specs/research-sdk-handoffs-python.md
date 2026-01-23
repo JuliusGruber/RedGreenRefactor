@@ -88,7 +88,7 @@ Your responsibilities:
 
 You DO NOT write actual test code—only plan tests.""",
             tools=["Read", "Write", "Glob", "Grep"],
-            model="sonnet"
+            model="opus"
         ),
 
         "test-agent": AgentDefinition(
@@ -103,7 +103,7 @@ Your responsibilities:
 
 Write minimal, focused tests.""",
             tools=["Read", "Write", "Bash"],
-            model="sonnet"
+            model="opus"
         ),
 
         "implementing-agent": AgentDefinition(
@@ -118,7 +118,7 @@ Your responsibilities:
 
 Do NOT over-engineer. Write just enough code.""",
             tools=["Read", "Write", "Edit", "Bash"],
-            model="sonnet"
+            model="opus"
         ),
 
         "refactor-agent": AgentDefinition(
@@ -133,7 +133,7 @@ Your responsibilities:
 
 May refactor any code in the codebase.""",
             tools=["Read", "Edit", "Bash", "Grep"],
-            model="sonnet"
+            model="opus"
         )
     }
 )
@@ -320,7 +320,7 @@ class TDDOrchestrator:
             options=ClaudeAgentOptions(
                 cwd=str(self.project_root),
                 allowed_tools=tools,
-                model="claude-sonnet-4-5"
+                model="claude-opus-4-5-20251101"
             )
         ):
             if msg.type == 'assistant':

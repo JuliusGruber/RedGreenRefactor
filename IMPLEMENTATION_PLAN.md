@@ -147,7 +147,7 @@ This document provides a detailed implementation plan for building the multi-age
   - Determine when feature is complete
   - Output JSON: `{"test": "description", "complete": false}`
 - [ ] Tools: all (read, write, edit, bash, glob, grep)
-- [ ] Model: Claude Sonnet
+- [ ] Model: Claude Opus 4.5
 
 ### 4.2 Test Agent (Red Phase)
 - [ ] Define system prompt:
@@ -156,7 +156,7 @@ This document provides a detailed implementation plan for building the multi-age
   - Test must compile but FAIL when run
   - Commit with "test:" prefix
 - [ ] Tools: all (read, write, edit, bash, glob, grep)
-- [ ] Model: Claude Sonnet
+- [ ] Model: Claude Opus 4.5
 - [ ] Must verify test fails before completing
 
 ### 4.3 Implementing Agent (Green Phase)
@@ -166,7 +166,7 @@ This document provides a detailed implementation plan for building the multi-age
   - Ensure all tests pass
   - Commit with "feat:" or "fix:" prefix
 - [ ] Tools: all (read, write, edit, bash, glob, grep)
-- [ ] Model: Claude Sonnet
+- [ ] Model: Claude Opus 4.5
 - [ ] Must verify all tests pass before completing
 
 ### 4.4 Refactor Agent
@@ -176,7 +176,7 @@ This document provides a detailed implementation plan for building the multi-age
   - Ensure all tests still pass
   - Commit with "refactor:" prefix
 - [ ] Tools: all (read, write, edit, bash, glob, grep)
-- [ ] Model: Claude Sonnet
+- [ ] Model: Claude Opus 4.5
 - [ ] Must verify all tests pass after refactoring
 
 ### 4.5 Verification Checklist
@@ -321,7 +321,7 @@ This document provides a detailed implementation plan for building the multi-age
   - `ANTHROPIC_API_KEY` - API key (required)
   - `TDD_PROJECT_ROOT` - project directory (default: current)
   - `TDD_MAX_RETRIES` - retry limit (default: 3)
-  - `TDD_MODEL` - model to use (default: claude-sonnet-4-20250514)
+  - `TDD_MODEL` - model to use (default: claude-opus-4-5-20251101)
 - [ ] Support config file `.tdd-config.json`
 
 ### 7.4 Verification Checklist
