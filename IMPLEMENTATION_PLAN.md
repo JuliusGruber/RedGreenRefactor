@@ -37,9 +37,9 @@ This document provides a detailed implementation plan for building the multi-age
 - [ ] Create Java project structure with Maven
 - [ ] Configure `pom.xml` with all dependencies:
   - `com.anthropic:anthropic-java:2.11.1`
-  - `org.eclipse.jgit:org.eclipse.jgit:6.10.0.202406032230-r`
-  - `com.fasterxml.jackson.core:jackson-databind:2.18.2`
-  - `org.slf4j:slf4j-simple:2.0.9`
+  - `org.eclipse.jgit:org.eclipse.jgit:7.5.0.202512021534-r`
+  - `com.fasterxml.jackson.core:jackson-databind:2.21.0`
+  - `org.slf4j:slf4j-simple:2.0.17`
 - [ ] Set up Java 21 toolchain
 - [ ] Create package structure: `com.redgreenrefactor.{orchestrator,agent,git,tool,model}`
 
@@ -472,26 +472,26 @@ src/
     <dependency>
         <groupId>org.eclipse.jgit</groupId>
         <artifactId>org.eclipse.jgit</artifactId>
-        <version>6.10.0.202406032230-r</version>
+        <version>7.5.0.202512021534-r</version>
     </dependency>
 
     <!-- JSON processing -->
     <dependency>
         <groupId>com.fasterxml.jackson.core</groupId>
         <artifactId>jackson-databind</artifactId>
-        <version>2.18.2</version>
+        <version>2.21.0</version>
     </dependency>
 
     <!-- Logging -->
     <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
-        <version>2.0.9</version>
+        <version>2.0.17</version>
     </dependency>
     <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-simple</artifactId>
-        <version>2.0.9</version>
+        <version>2.0.17</version>
         <scope>runtime</scope>
     </dependency>
 
@@ -499,26 +499,26 @@ src/
     <dependency>
         <groupId>info.picocli</groupId>
         <artifactId>picocli</artifactId>
-        <version>4.7.5</version>
+        <version>4.7.7</version>
     </dependency>
 
     <!-- Testing -->
     <dependency>
         <groupId>org.junit.jupiter</groupId>
         <artifactId>junit-jupiter</artifactId>
-        <version>5.10.1</version>
+        <version>6.0.2</version>
         <scope>test</scope>
     </dependency>
     <dependency>
         <groupId>org.mockito</groupId>
         <artifactId>mockito-core</artifactId>
-        <version>5.8.0</version>
+        <version>5.21.0</version>
         <scope>test</scope>
     </dependency>
     <dependency>
         <groupId>org.assertj</groupId>
         <artifactId>assertj-core</artifactId>
-        <version>3.24.2</version>
+        <version>3.27.6</version>
         <scope>test</scope>
     </dependency>
 </dependencies>
