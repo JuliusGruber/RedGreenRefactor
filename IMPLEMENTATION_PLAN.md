@@ -522,6 +522,20 @@ src/
 
 ---
 
+## Out of Scope (Initial Implementation)
+
+The following features are deferred for future implementation:
+
+### Pre-existing Codebase Handling
+- How does the workflow handle existing codebases with existing tests?
+- Should the Test List Agent account for existing tests when planning?
+- Do existing tests count toward "all tests must pass"?
+- Is this workflow scoped to new features only, or can it modify existing functionality?
+
+**Initial assumption**: The orchestrator assumes a greenfield project or isolated feature development where existing tests (if any) should always pass.
+
+---
+
 ## Related Documentation
 
 - [Main Specification](specs/spec.md) - TDD workflow and agent roles
