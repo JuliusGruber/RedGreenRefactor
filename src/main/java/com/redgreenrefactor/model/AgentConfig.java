@@ -73,7 +73,7 @@ public record AgentConfig(
         }
 
         public Builder tools(List<Tool> tools) {
-            this.tools = tools;
+            this.tools = tools == null ? List.of() : List.copyOf(tools);
             return this;
         }
 
