@@ -54,20 +54,7 @@ public class BashToolHandler implements ToolExecutor {
 
             Process process = processBuilder.start();
 
-            // Read output asynchronously to avoid blocking on readLine()
-            CompletableFuture<String> outputFuture = CompletableFuture.supplyAsync(() -> {
-                StringBuilder output = new StringBuilder();
-                try (BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(process.getInputStream()))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        output.append(line).append("\n");
-                    }
-                } catch (IOException e) {
-                    output.append("Error reading output: ").append(e.getMessage());
-                }
-                return output.toString().trim();
-            });
+            CompletableFuture<String> outputFuture = readProcessOutputAsync(process);
 
             // Wait for process with timeout
             boolean completed = process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
@@ -77,15 +64,7 @@ public class BashToolHandler implements ToolExecutor {
                 return ToolResult.failure("Command timed out after " + timeoutSeconds + " seconds");
             }
 
-            // Get output (should be ready now)
-            String outputStr;
-            try {
-                outputStr = outputFuture.get(1, TimeUnit.SECONDS);
-            } catch (TimeoutException e) {
-                outputStr = "(output collection timed out)";
-            } catch (ExecutionException e) {
-                outputStr = "(error collecting output)";
-            }
+            String outputStr = getOutputWithTimeout(outputFuture);
 
             int exitCode = process.exitValue();
 
@@ -99,12 +78,37 @@ public class BashToolHandler implements ToolExecutor {
         }
     }
 
+    private String getOutputWithTimeout(CompletableFuture<String> outputFuture) {
+        try {
+            return outputFuture.get(1, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            return "(output collection timed out)";
+        } catch (ExecutionException | InterruptedException e) {
+            return "(error collecting output)";
+        }
+    }
+
+    private CompletableFuture<String> readProcessOutputAsync(Process process) {
+        return CompletableFuture.supplyAsync(() -> {
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(process.getInputStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+            } catch (IOException e) {
+                output.append("Error reading output: ").append(e.getMessage());
+            }
+            return output.toString().trim();
+        });
+    }
+
     private ProcessBuilder createProcessBuilder(String command) {
         String os = System.getProperty("os.name").toLowerCase();
         if (os.contains("win")) {
             return new ProcessBuilder("cmd.exe", "/c", command);
-        } else {
-            return new ProcessBuilder("sh", "-c", command);
         }
+        return new ProcessBuilder("sh", "-c", command);
     }
 }

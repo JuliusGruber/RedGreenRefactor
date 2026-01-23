@@ -1,8 +1,14 @@
 package com.redgreenrefactor.tool;
 
 import java.io.IOException;
-import java.nio.file.*;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.PathMatcher;
+import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.Set;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -45,9 +51,7 @@ public class GrepToolHandler implements ToolExecutor {
             return ToolResult.failure("Invalid regex pattern: " + e.getMessage());
         }
 
-        Path searchPath = pathStr != null && !pathStr.isBlank()
-                ? Path.of(pathStr)
-                : defaultDirectory;
+        Path searchPath = resolveSearchPath(pathStr);
 
         if (!Files.exists(searchPath)) {
             return ToolResult.failure("Path not found: " + searchPath);
@@ -128,11 +132,8 @@ public class GrepToolHandler implements ToolExecutor {
 
                 @Override
                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
-                    // Skip hidden directories and common non-source directories
                     String dirName = dir.getFileName() != null ? dir.getFileName().toString() : "";
-                    if (dirName.startsWith(".") || dirName.equals("node_modules") ||
-                        dirName.equals("target") || dirName.equals("build") ||
-                        dirName.equals("dist") || dirName.equals("__pycache__")) {
+                    if (shouldSkipDirectory(dirName)) {
                         return FileVisitResult.SKIP_SUBTREE;
                     }
                     return FileVisitResult.CONTINUE;
@@ -154,25 +155,31 @@ public class GrepToolHandler implements ToolExecutor {
         }
     }
 
+    private static final Set<String> SKIPPED_DIRECTORIES = Set.of(
+            "node_modules", "target", "build", "dist", "__pycache__"
+    );
+
+    private static final Set<String> BINARY_EXTENSIONS = Set.of(
+            ".class", ".jar", ".war", ".ear",
+            ".zip", ".tar", ".gz",
+            ".png", ".jpg", ".jpeg", ".gif", ".ico",
+            ".pdf", ".exe", ".dll", ".so", ".dylib"
+    );
+
+    private Path resolveSearchPath(String pathStr) {
+        if (pathStr != null && !pathStr.isBlank()) {
+            return Path.of(pathStr);
+        }
+        return defaultDirectory;
+    }
+
+    private boolean shouldSkipDirectory(String dirName) {
+        return dirName.startsWith(".") || SKIPPED_DIRECTORIES.contains(dirName);
+    }
+
     private boolean isBinaryFile(Path file) {
         String fileName = file.getFileName().toString().toLowerCase();
-        return fileName.endsWith(".class") ||
-               fileName.endsWith(".jar") ||
-               fileName.endsWith(".war") ||
-               fileName.endsWith(".ear") ||
-               fileName.endsWith(".zip") ||
-               fileName.endsWith(".tar") ||
-               fileName.endsWith(".gz") ||
-               fileName.endsWith(".png") ||
-               fileName.endsWith(".jpg") ||
-               fileName.endsWith(".jpeg") ||
-               fileName.endsWith(".gif") ||
-               fileName.endsWith(".ico") ||
-               fileName.endsWith(".pdf") ||
-               fileName.endsWith(".exe") ||
-               fileName.endsWith(".dll") ||
-               fileName.endsWith(".so") ||
-               fileName.endsWith(".dylib");
+        return BINARY_EXTENSIONS.stream().anyMatch(fileName::endsWith);
     }
 
     private record GrepMatch(String file, int lineNumber, String line) {}
