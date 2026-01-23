@@ -18,3 +18,12 @@ This project is configured with GitHub's official MCP server for PR and reposito
 ## Adding MCP Servers
 
 When asked to add a new MCP server, add it to the `.mcp.json` file in the project root. This file contains the consolidated MCP server configuration for the project.
+
+## Commit Requirements
+
+Before making any commit:
+
+1. **Verify the build passes** - Run the build command and ensure it completes successfully
+2. **Run all tests** - Execute the full test suite and ensure all tests pass
+
+Do not commit code that fails to build or has failing tests.
