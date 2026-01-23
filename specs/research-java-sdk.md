@@ -241,7 +241,7 @@ public record AgentDefinition(
     String name,
     String description,
     String systemPrompt,
-    List<Tool> allowedTools,
+    List<Tool> tools,
     Model model
 ) {}
 
@@ -263,8 +263,16 @@ public AgentDefinition testListAgent() {
 
         Output your selected test in a JSON block:
         ```json
-        {"test": "description of the test", "complete": false}
+        {
+          "currentTest": {
+            "description": "test description",
+            "testFile": "src/test/java/...",
+            "implFile": "src/main/java/..."
+          },
+          "nextPhase": "RED"
+        }
         ```
+        Or when complete: {"currentTest": null, "nextPhase": "COMPLETE"}
         """,
         getAllTools(),
         Model.CLAUDE_OPUS_4_5_20251101
@@ -422,16 +430,16 @@ public class TDDTools {
                         "type", "string",
                         "description", "The absolute path to the file"
                     ),
-                    "old_text", Map.of(
+                    "old_string", Map.of(
                         "type", "string",
                         "description", "The text to replace"
                     ),
-                    "new_text", Map.of(
+                    "new_string", Map.of(
                         "type", "string",
                         "description", "The replacement text"
                     )
                 )))
-                .putAdditionalProperty("required", JsonValue.from(List.of("file_path", "old_text", "new_text")))
+                .putAdditionalProperty("required", JsonValue.from(List.of("file_path", "old_string", "new_string")))
                 .build())
             .build();
     }
