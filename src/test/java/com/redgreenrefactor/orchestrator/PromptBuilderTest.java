@@ -81,7 +81,7 @@ class PromptBuilderTest {
         String prompt = promptBuilder.buildPlanPrompt("Test feature", state);
 
         assertThat(prompt).contains("This is a new feature");
-        assertThat(prompt).contains("Break down the feature");
+        assertThat(prompt).contains("Analyze the feature requirements");
     }
 
     @Test

@@ -81,6 +81,10 @@ public class PhaseExecutor {
         Objects.requireNonNull(phase, "phase cannot be null");
         Objects.requireNonNull(state, "state cannot be null");
 
+        if (phase == Phase.COMPLETE) {
+            throw new IllegalArgumentException("Cannot execute COMPLETE phase");
+        }
+
         LOG.info("Executing phase: {} (cycle {})", phase, state.cycleNumber());
 
         try {
