@@ -130,7 +130,7 @@ class TestListOutputParserTest {
 
         assertThatThrownBy(() -> parser.parseTestSelection(response))
                 .isInstanceOf(OrchestratorException.class)
-                .hasMessageContaining("missing 'currentTest'");
+                .hasMessageContaining("Could not find JSON");
     }
 
     @Test
