@@ -36,6 +36,7 @@ class GitNotesManagerTest {
     void setUp() throws Exception {
         // Initialize a new Git repository in the temp directory
         git = Git.init().setDirectory(tempDir.toFile()).call();
+        disableGpgSigning(git);
 
         // Create an initial commit so we have something to attach notes to
         Files.writeString(tempDir.resolve("README.md"), "# Test Project");
@@ -348,5 +349,11 @@ class GitNotesManagerTest {
         assertThatThrownBy(() -> new GitNotesManager.HandoffEntry(commitId, null))
                 .isInstanceOf(NullPointerException.class)
                 .hasMessageContaining("state");
+    }
+
+    private static void disableGpgSigning(Git git) throws IOException {
+        var config = git.getRepository().getConfig();
+        config.setBoolean("commit", null, "gpgsign", false);
+        config.save();
     }
 }
