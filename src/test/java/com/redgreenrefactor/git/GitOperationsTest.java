@@ -29,6 +29,7 @@ class GitOperationsTest {
     void setUp() throws Exception {
         // Initialize a new Git repository
         git = Git.init().setDirectory(tempDir.toFile()).call();
+        disableGpgSigning(git);
 
         // Create initial commit
         Files.writeString(tempDir.resolve("README.md"), "# Test Project");
@@ -118,6 +119,7 @@ class GitOperationsTest {
         Files.createDirectories(emptyRepoDir);
         try (Git emptyGit = Git.init().setDirectory(emptyRepoDir.toFile()).call();
              GitOperations emptyOps = new GitOperations(emptyRepoDir)) {
+            disableGpgSigning(emptyGit);
 
             Optional<ObjectId> latestCommit = emptyOps.getLatestCommit();
 
@@ -181,6 +183,7 @@ class GitOperationsTest {
         Path newRepoDir = tempDir.resolve("new-repo");
         Files.createDirectories(newRepoDir);
         try (Git newGit = Git.init().setDirectory(newRepoDir.toFile()).call()) {
+            disableGpgSigning(newGit);
             Files.writeString(newRepoDir.resolve("first.txt"), "first content");
             newGit.add().addFilepattern(".").call();
             RevCommit firstCommit = newGit.commit().setMessage("First commit").call();
@@ -342,5 +345,11 @@ class GitOperationsTest {
 
         List<String> changedFiles = gitOps.getChangedFiles(commitId);
         assertThat(changedFiles).contains("src/main/java/App.java");
+    }
+
+    private static void disableGpgSigning(Git git) throws IOException {
+        var config = git.getRepository().getConfig();
+        config.setBoolean("commit", null, "gpgsign", false);
+        config.save();
     }
 }
