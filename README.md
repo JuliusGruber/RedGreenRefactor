@@ -4,4 +4,8 @@ A CLI tool that automates Test-Driven Development using multiple Claude AI agent
 
 ## Demo
 
-A test run of this agent can be seen at [RedGreenRefactorDemo](https://github.com/JuliusGruber/RedGreenRefactorDemo).
+> *"Implement a Calculator class with add, subtract, multiply, and divide methods"*
+
+![Git log](https://raw.githubusercontent.com/JuliusGruber/RedGreenRefactorDemo/master/resources/img.png)
+
+A full test run of this agent can be seen at [RedGreenRefactorDemo](https://github.com/JuliusGruber/RedGreenRefactorDemo).
